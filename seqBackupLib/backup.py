@@ -1,49 +1,41 @@
 import argparse
 import os
 import re
+import gzip
 
-def find_run_name(forward_reads):
-    dir_split = forward_reads.split(os.sep)
-    matches = [re.search("\\d{6}_[DM]\\d{5}_\\d{4}", d) for d in dir_split]
-    matches = [dir_split[i] for i, m in enumerate(matches) if m]
-    if len(matches) != 1:
-        raise ValueError("Could not find run name in directory: {0}".format(forward_reads))
-    return matches[0]
+from seqBackupLib.illumina import IlluminaFastq
 
+def build_fp_to_archive(file_name, has_index, lane):
+    label = ["R2"]
+    if has_index:
+        label.extend(["I1", "I2"])
 
-def backup_fastq(forward_reads, num_lanes, run_name, dest_dir, has_index):
+    rexp = "".join(["(L00", lane, "_)(R1)(_001.fastq.gz)$"])
+    modified_fp = [re.sub(rexp, "".join(["\\1", lab, "\\3"]), file_name) for lab in label]
+    return [file_name] + modified_fp
+
+def backup_fastq(forward_reads, dest_dir, has_index, min_file_size):
     
+    R1 = IlluminaFastq(gzip.GzipFile(forward_reads))    
 
-    # parse out the run name
-    if run_name is None:
-        run_name = find_run_name(forward_reads)
-
+    # build the strings for the required files    
+    file_name_RI = build_fp_to_archive(forward_reads, has_index, R1.lane)
     
-    # parse out the file name
-    file_name = forward_reads.split(os.sep)[-1]
+    # create the Illumina objects and check the files
+    illumina_fastqs = []
+    for fp in file_name_RI:
+        illumina_temp = IlluminaFastq(gzip.GzipFile(fp))
+        illumina_temp.check_fp_vs_content()
+        illumina_temp.check_file_size(min_file_size)
+        illumina_temp.check_index_read_exists()
+        illumina_fastqs.append(str(illumina_temp))
 
-
-    # build the strings for the required files
-    
-
-
-    # check if the files are actually there
-
-    # check their size. If less than 500 Mb quit with error
-
-    
     # parse the info from the headers in EACH file and check they are consistent within each other
-
-    # check to make sure the run name matches the folder name
-
-
-    # check to make sure they have barcode info
+    if not all([fastq == illumina_fastqs[0] for fastq in illumina_fastqs]):
+        raise ValueError("The files are not from the same run.")
 
 
-
-
-
-    # build the destination folder
+    ## Everything to do with the destination folder
 
     # create the folder. If it exists exit
 
@@ -55,6 +47,10 @@ def backup_fastq(forward_reads, num_lanes, run_name, dest_dir, has_index):
     # move the incoming folder to a subfolder called "imported"
 
 
+    # write md5sums to a file
+
+
+    # remove write permission from file
 
 
 
@@ -63,30 +59,30 @@ def main(argv=None):
 
     parser.add_argument(
         "--forward-reads", required=True,
-        type=argparse.FileType("r"),
-        help="R1.fastq")
-    parser.add_argument(
-        "--number-of-lanes", required=True,
-        type=int,
-        help="Number of lanes sequenced")
-    parser.add_argument(
-        "--run-name", required=False,
         type=str,
-        help="The run name to backup as. Defaults to the Illumina file.")
+        help="R1.fastq")
+    #parser.add_argument(
+    #    "--lane-num", required=True,
+    #    type=int,
+    #    help="Number of lanes sequenced")
+    #parser.add_argument(
+    #    "--run-name", required=False,
+    #    type=str,
+    #    help="The run name to backup as. Defaults to the Illumina file.")
     parser.add_argument(
-        "--destination-dir", required=False,
+        "--destination-dir", required=True,
         type=str,
         help="Destination folder to copy the files to.")
     parser.add_argument(
         "--has-index", required=False,
-        type=bool,
+        type=bool, default=True,
         help="Are index reads generated")
+    parser.add_argument(
+        "--min-file-size", required=False,
+        type=int, default=500000000,
+        help="Minimum file size to register in bytes")
     args = parser.parse_args(argv)
 
-    # Check if the R1 file exists
-    fwd_fp = args.forward_reads.name
-    args.forward_reads.close()
-
-    backup_fastq(args.forward_reads.name, args.number_of_lanes, args.run_name, args.destination_dir, args.has_index)
+    backup_fastq(args.forward_reads, args.destination_dir, args.has_index, args.min_file_size)
 
     # maybe also ask for single or double reads
