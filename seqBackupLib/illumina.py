@@ -64,23 +64,25 @@ class IlluminaFastq(object):
             raise ValueError("Could not find run name in directory: {0}".format(self.filepath))
         return matches[0]
 
+    def build_archive_dir(self):
+        return '_'.join([self.run_name, 'L{:0>3}'.format(self.lane)])
+
     def check_fp_vs_content(self):
         build_run_name = "_".join([self.fastq_info["instrument"],
                                    '{:0>4}'.format(self.fastq_info["run_number"]),
                                    self.fastq_info["flowcell_id"]])
 
         run_check = build_run_name == self.run_name[7:]
-        print(self.filepath)
+        
         matches = re.search("L00(\d)_[RI](\d)_001.fastq.gz$", self.filepath)
         lane_check = self.lane == matches.group(1)
         read_check = self.fastq_info["read"] == matches.group(2)
-        if not (run_check & lane_check & read_check):
+        if not (run_check and lane_check and read_check):
             raise ValueError("The file path and header infromation don't match")
     
     def check_file_size(self, min_file_size):
         if os.path.getsize(self.filepath) < min_file_size:
-            raise ValueError("File {0} seems suspiciously small. Plese check if you have the correct file or lower the minimum fi\
-le size threshold".format(fp))
+            raise ValueError("File {0} seems suspiciously small. Plese check if you have the correct file or lower the minimum file size threshold".format(fp))
 
     def check_index_read_exists(self):
         if len(self.fastq_info["index_reads"]) < 2:
