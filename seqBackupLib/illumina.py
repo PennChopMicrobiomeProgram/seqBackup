@@ -77,13 +77,10 @@ class IlluminaFastq(object):
         matches = re.search("L00(\d)_[RI](\d)_001.fastq.gz$", self.filepath)
         lane_check = self.lane == matches.group(1)
         read_check = self.fastq_info["read"] == matches.group(2)
-        if not (run_check and lane_check and read_check):
-            raise ValueError("The file path and header infromation don't match")
+        return (run_check and lane_check and read_check)
     
     def check_file_size(self, min_file_size):
-        if os.path.getsize(self.filepath) < min_file_size:
-            raise ValueError("File {0} seems suspiciously small. Plese check if you have the correct file or lower the minimum file size threshold".format(fp))
+        return os.path.getsize(self.filepath) > min_file_size
 
     def check_index_read_exists(self):
-        if len(self.fastq_info["index_reads"]) < 2:
-            warnings.warn("No barcodes in headers. Were the fastq files generated properly?: {0}".format(self.filepath))
+        return len(self.fastq_info["index_reads"]) > 2

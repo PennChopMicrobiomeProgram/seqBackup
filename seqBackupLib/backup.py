@@ -40,9 +40,12 @@ def backup_fastq(forward_reads, dest_dir, has_index, min_file_size):
     illumina_fastqs = []
     for fp in file_names_RI:
         illumina_temp = IlluminaFastq(gzip.GzipFile(fp))
-        illumina_temp.check_fp_vs_content()
-        illumina_temp.check_file_size(min_file_size)
-        illumina_temp.check_index_read_exists()
+        if not illumina_temp.check_fp_vs_content():
+            raise ValueError("The file path and header infromation don't match")
+        if not illumina_temp.check_file_size(min_file_size):
+            raise ValueError("File {0} seems suspiciously small. Plese check if you have the correct file or lower the minimum file size threshold".format(fp))
+        if not illumina_temp.check_index_read_exists():
+            warnings.warn("No barcodes in headers. Were the fastq files generated properly?: {0}".format(fp))
         illumina_fastqs.append(str(illumina_temp))
 
     # parse the info from the headers in EACH file and check they are consistent within each other
