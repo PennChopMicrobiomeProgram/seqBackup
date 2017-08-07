@@ -29,7 +29,7 @@ def return_md5(fname):
             hash_md5.update(chunk)
     return hash_md5.hexdigest()
 
-def backup_fastq(forward_reads, dest_dir, has_index, min_file_size):
+def backup_fastq(forward_reads, dest_dir, sample_sheet_fp, has_index, min_file_size):
     
     R1 = IlluminaFastq(gzip.GzipFile(forward_reads))    
 
@@ -54,6 +54,10 @@ def backup_fastq(forward_reads, dest_dir, has_index, min_file_size):
 
     ## Archiving steps
 
+    # make sure the sample sheet exists
+    if not os.path.isfile(sample_sheet_fp):
+        raise IOError("Sample sheet does not exist: {}".format(sample_sheet_fp))
+
     # create the folder to write to
     write_dir = os.path.join(dest_dir, illumina_temp.build_archive_dir())
 
@@ -64,6 +68,13 @@ def backup_fastq(forward_reads, dest_dir, has_index, min_file_size):
 
     # move the files to the archive location
     [shutil.copyfile(fp, os.path.join(write_dir, os.path.basename(fp))) for fp in file_names_RI]
+
+    # make sure the sample sheet exists 
+    if not os.path.isfile(sample_sheet_fp):
+        raise IOError("Sample sheet does not exist: {}".format(sample_sheet_fp))
+
+    # copy the sample sheet to destination folder
+    shutil.copyfile(sample_sheet_fp, os.path.join(write_dir, os.path.basename(sample_sheet_fp)))
 
     # write md5sums to a file
     md5s = [(os.path.basename(fp), return_md5(fp)) for fp in file_names_RI]
@@ -87,6 +98,10 @@ def main(argv=None):
         type=str,
         help="Destination folder to copy the files to.")
     parser.add_argument(
+        "--sample-sheet", required=True,
+        type=str,
+        help="The sample sheet associated with the run.")
+    parser.add_argument(
         "--has-index", required=False,
         type=bool, default=True,
         help="Are index reads generated")
@@ -96,6 +111,6 @@ def main(argv=None):
         help="Minimum file size to register in bytes")
     args = parser.parse_args(argv)
 
-    backup_fastq(args.forward_reads, args.destination_dir, args.has_index, args.min_file_size)
+    backup_fastq(args.forward_reads, args.destination_dir, args.sample_sheet, args.has_index, args.min_file_size)
 
     # maybe also ask for single or double reads
