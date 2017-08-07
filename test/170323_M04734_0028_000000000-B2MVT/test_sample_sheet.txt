@@ -1,0 +1,5 @@
+SampleID	SampleType	study_group
+S1		Oral swab	healthy
+S2		Oral swab	active
+S3		Feces		healthy
+S4		Feces		active
