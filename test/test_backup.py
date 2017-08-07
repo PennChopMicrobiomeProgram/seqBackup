@@ -13,8 +13,8 @@ class BackupTests(unittest.TestCase):
         self.fastq_filepath = fastq_filepath = os.path.join(self.curr_dir, "170323_M04734_0028_000000000-B2MVT/small_Undetermined_S0_L001_R1_001.fastq.gz")
         self.temp_out_dir = tempfile.mkdtemp(dir=self.curr_dir)
 
-    #def tearDown(self):
-    #    shutil.rmtree(self.temp_out_dir)
+    def tearDown(self):
+        shutil.rmtree(self.temp_out_dir)
 
     def test_build_fp_to_archive(self):
         list1 = build_fp_to_archive("Undetermined_S0_L001_R1_001.fastq.gz", True, "1")
@@ -27,13 +27,16 @@ class BackupTests(unittest.TestCase):
         has_index = True
         min_file_size = 5
         backup_fastq(self.fastq_filepath, self.temp_out_dir, has_index, min_file_size)
+        
         # check the md5sums of the first fastq is the same
+        fq = IlluminaFastq(gzip.GzipFile(self.fastq_filepath))
+        out_fp = os.path.join(self.temp_out_dir, fq.build_archive_dir(), os.path.basename(self.fastq_filepath))
         md5_orj = return_md5(self.fastq_filepath)
-        md5_trans = return_md5(os.path.join(self.temp_out_dir, os.path.basename(self.fastq_filepath)))
+        md5_trans = return_md5(out_fp)
         self.assertEqual(md5_orj, md5_trans)
         
         # check write permissions of the files
-        
+        self.assertEqual(os.stat(out_fp).st_mode, 33060)
     
     def test_return_md5(self):
         self.assertEqual(return_md5(self.fastq_filepath), "13695e47114c02536ae3ca6823a42261")
