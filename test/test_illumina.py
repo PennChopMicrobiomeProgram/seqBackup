@@ -23,11 +23,21 @@ class IlluminaTests(unittest.TestCase):
         self.assertEqual(fq.run_name, "160511_M03543_0047_000000000-APE6Y")
 
     def test_fp_vs_content(self):
-        # check correct case
+        # check correct case for Miseq data
         fastq_file = StringIO(
             u"@M04734:28:000000000-B2MVT:1:2106:17605:1940 1:N:0:TTTTTTTTTTTT+TCTTTCCCTACA")
         fastq_filepath = (
             "Miseq/170323_M04734_0028_000000000-B2MVT/Data/Intensities/"
+            "BaseCalls/Undetermined_S0_L001_R1_001.fastq.gz")
+        fastq_file.name = fastq_filepath
+        fq = IlluminaFastq(fastq_file)
+        self.assertTrue(fq.check_fp_vs_content())
+
+        # check correct case for Hiseq data
+        fastq_file = StringIO(
+            u"@D00727:27:CA7HHANXX:1:1105:1243:1992 1:N:0:NGATCAGT+NNAAGGAG")
+        fastq_filepath = (
+            "Hiseq/170330_D00727_0027_ACA7HHANXX/Data/Intensities/"
             "BaseCalls/Undetermined_S0_L001_R1_001.fastq.gz")
         fastq_file.name = fastq_filepath
         fq = IlluminaFastq(fastq_file)
@@ -96,6 +106,7 @@ class IlluminaTests(unittest.TestCase):
         self.assertFalse(fq.check_index_read_exists())
 
     def test_build_archive_dir(self):
+        # for MiSeq
         fastq_file = StringIO(
             u"@M03543:47:C8LJ2ANXX:1:2209:1084:2044 1:N:0:NNNNNNNN+NNNNNNNN")
         fastq_filepath = (
@@ -104,6 +115,16 @@ class IlluminaTests(unittest.TestCase):
         fastq_file.name = fastq_filepath
         fq = IlluminaFastq(fastq_file)
         self.assertEqual(fq.build_archive_dir(), "160511_M03543_0047_000000000-APE6Y_L001")
+
+        # for HiSeq
+        fastq_file = StringIO(
+            u"@D00727:27:CA7HHANXX:1:1105:1243:1992 1:N:0:NGATCAGT+NNAAGGAG")
+        fastq_filepath = (
+            "Hiseq/170330_D00727_0027_ACA7HHANXX/Data/Intensities/"
+            "BaseCalls/Undetermined_S0_L001_R1_001.fastq.gz")
+        fastq_file.name = fastq_filepath
+        fq = IlluminaFastq(fastq_file)
+        self.assertEqual(fq.build_archive_dir(), "170330_D00727_0027_ACA7HHANXX_L001")
 
     def test_check_file_size(self):
         curr_dir = os.path.dirname(os.path.abspath(__file__))

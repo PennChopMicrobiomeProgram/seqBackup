@@ -68,12 +68,17 @@ class IlluminaFastq(object):
         return '_'.join([self.run_name, 'L{:0>3}'.format(self.lane)])
 
     def check_fp_vs_content(self):
+
         build_run_name = "_".join([self.fastq_info["instrument"],
                                    '{:0>4}'.format(self.fastq_info["run_number"]),
                                    self.fastq_info["flowcell_id"]])
 
-        run_check = build_run_name == self.run_name[7:]
-        
+        run_name_to_check = self.run_name[7:]
+        if self.machine_type == "Illumina-HiSeq":
+            run_name_to_check = run_name_to_check[0:12] + run_name_to_check[13:]
+
+        run_check = build_run_name == run_name_to_check
+
         matches = re.search("L00(\d)_[RI](\d)_001.fastq.gz$", self.filepath)
         lane_check = self.lane == matches.group(1)
         read_check = self.fastq_info["read"] == matches.group(2)
