@@ -25,6 +25,23 @@ class IlluminaTests(unittest.TestCase):
 
         self.assertDictEqual(fq.folder_info, folder_info)
 
+        fastq_file = StringIO(
+            u"@D00727:27:CA7HHANXX:1:1105:1243:1992 1:N:0:NGATCAGT+NNAAGGAG")
+        fastq_filepath = (
+            "Hiseq/170330_D00727_0027_ACA7HHANXX/Data/Intensities/"
+            "BaseCalls/Undetermined_S0_L001_R1_001.fastq.gz")
+        folder_info = {"date":"170330", "instrument":"D00727", "run_number":"27", "flowcell_id":"CA7HHANXX", "lane":"1", "read_or_index":"R", "read":"1"}
+        fastq_file.name = fastq_filepath
+        fq = IlluminaFastq(fastq_file)
+
+        self.assertEqual(fq.machine_type, "Illumina-HiSeq")
+        self.assertEqual(fq.date, "2017-03-30")
+        self.assertEqual(fq.lane, "1")
+        self.assertEqual(fq.filepath, fastq_filepath)
+        self.assertEqual(fq.run_name, "170330_D00727_0027_ACA7HHANXX")
+
+        self.assertDictEqual(fq.folder_info, folder_info)
+
     def test_fp_vs_content(self):
         # check correct case for Miseq data
         fastq_file = StringIO(
