@@ -18,6 +18,12 @@ class IlluminaFastq(object):
                          self.fastq_info["flowcell_id"],
                          self.fastq_info["lane"]])
 
+    def is_same_run(self, other):
+        run_check = self.fastq_info["run_number"] == other.fastq_info["run_number"]
+        instrument_check = self.fastq_info["instrument"] == other.fastq_info["instrument"]
+        flowcell_check = self.fastq_info["flowcell_id"] == other.fastq_info["flowcell_id"]
+        return (run_check and instrument_check and flowcell_check)
+
     def _parse_header(self):
         line = next(self.file).strip()
         if not line.startswith("@"):

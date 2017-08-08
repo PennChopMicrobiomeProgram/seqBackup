@@ -46,10 +46,10 @@ def backup_fastq(forward_reads, dest_dir, sample_sheet_fp, has_index, min_file_s
             raise ValueError("File {0} seems suspiciously small. Plese check if you have the correct file or lower the minimum file size threshold".format(fp))
         if not illumina_temp.check_index_read_exists():
             warnings.warn("No barcodes in headers. Were the fastq files generated properly?: {0}".format(fp))
-        illumina_fastqs.append(str(illumina_temp))
+        illumina_fastqs.append(illumina_temp)
 
     # parse the info from the headers in EACH file and check they are consistent within each other
-    if not all([fastq == illumina_fastqs[0] for fastq in illumina_fastqs]):
+    if not all([fastq.is_same_run(illumina_fastqs[0]) for fastq in illumina_fastqs]):
         raise ValueError("The files are not from the same run.")
 
     ## Archiving steps
@@ -66,12 +66,13 @@ def backup_fastq(forward_reads, dest_dir, sample_sheet_fp, has_index, min_file_s
         raise IOError("The folder already exists: {}".format(write_dir))
     os.mkdir(write_dir)
 
-    # move the files to the archive location
-    [shutil.copyfile(fp, os.path.join(write_dir, os.path.basename(fp))) for fp in file_names_RI]
+    ### All the checks are done and the files are safe to archive!
 
-    # make sure the sample sheet exists 
-    if not os.path.isfile(sample_sheet_fp):
-        raise IOError("Sample sheet does not exist: {}".format(sample_sheet_fp))
+    # move the files to the archive location and remove permission
+    permission = stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH
+    for fp in file_names_RI:
+        shutil.copyfile(fp, os.path.join(write_dir, os.path.basename(fp)))
+        os.chmod(os.path.join(write_dir, os.path.basename(fp)), permission) #this doesn't work on isilon
 
     # copy the sample sheet to destination folder
     shutil.copyfile(sample_sheet_fp, os.path.join(write_dir, os.path.basename(sample_sheet_fp)))
@@ -81,10 +82,6 @@ def backup_fastq(forward_reads, dest_dir, sample_sheet_fp, has_index, min_file_s
     md5out_fp = os.path.join(write_dir, ".".join([illumina_temp.build_archive_dir(), "md5"]))
     with open(md5out_fp, "w") as md5_out:
         [md5_out.write("\t".join(md5) + "\n") for md5 in md5s]
-
-    # remove write permission from file
-    permission = stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH
-    [os.chmod(os.path.join(write_dir, os.path.basename(fp)), permission) for fp in file_names_RI]
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Backs up fastq files")
