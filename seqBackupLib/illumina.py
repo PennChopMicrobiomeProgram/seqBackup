@@ -36,17 +36,18 @@ class IlluminaFastq(object):
         return vals1
 
     def _parse_folder(self):
-        print self.run_name
-        matches = re.match("(\\d{6})_([DM]\\d{5})_(\\d{4})_(.*)", self.run_name)
+        matches = re.match("(\\d{6})_([DM]\\d{5})_0*(\\d{1,4})_(.*)", self.run_name)
         keys1 = ("date", "instrument", "run_number", "flowcell_id")
         vals1 = dict((k, v) for k, v in zip(keys1, matches.groups()))
+
+        if self.machine_type == "Illumina-HiSeq":
+            vals1["flowcell_id"] =  vals1["flowcell_id"][1:]
 
         matches = re.match("Undetermined_S0_L00([1-8])_([RI])([12])_001.fastq.gz", os.path.basename(self.filepath))
         keys2 = ("lane", "read_or_index", "read")
         vals2 = dict((k, v) for k, v in zip(keys2, matches.groups()))
         
         vals1.update(vals2)
-        print(vals1)
         return vals1
 
     @property
@@ -83,21 +84,12 @@ class IlluminaFastq(object):
         return '_'.join([self.run_name, 'L{:0>3}'.format(self.lane)])
 
     def check_fp_vs_content(self):
-
-        build_run_name = "_".join([self.fastq_info["instrument"],
-                                   '{:0>4}'.format(self.fastq_info["run_number"]),
-                                   self.fastq_info["flowcell_id"]])
-
-        run_name_to_check = self.run_name[7:]
-        if self.machine_type == "Illumina-HiSeq":
-            run_name_to_check = run_name_to_check[0:12] + run_name_to_check[13:]
-
-        run_check = build_run_name == run_name_to_check
-
-        matches = re.search("L00(\d)_[RI](\d)_001.fastq.gz$", self.filepath)
-        lane_check = self.lane == matches.group(1)
-        read_check = self.fastq_info["read"] == matches.group(2)
-        return (run_check and lane_check and read_check)
+        run_check = self.fastq_info["run_number"] == self.folder_info["run_number"]
+        instrument_check = self.fastq_info["instrument"] == self.folder_info["instrument"]
+        flowcell_check = self.fastq_info["flowcell_id"] == self.folder_info["flowcell_id"]
+        lane_check = self.lane == self.folder_info["lane"]
+        read_check = self.fastq_info["read"] == self.folder_info["read"]
+        return (run_check and instrument_check and flowcell_check and lane_check and read_check)
     
     def check_file_size(self, min_file_size):
         return os.path.getsize(self.filepath) > min_file_size
