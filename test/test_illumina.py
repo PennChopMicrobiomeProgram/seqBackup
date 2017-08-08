@@ -128,7 +128,7 @@ class IlluminaTests(unittest.TestCase):
 
     def test_check_file_size(self):
         curr_dir = os.path.dirname(os.path.abspath(__file__))
-        fastq_filepath = os.path.join(curr_dir, "170323_M04734_0028_000000000-B2MVT/small_Undetermined_S0_L001_R1_001.fastq.gz")
+        fastq_filepath = os.path.join(curr_dir, "170323_M04734_0028_000000000-B2MVT/Undetermined_S0_L001_R1_001.fastq.gz")
         fq = IlluminaFastq(gzip.GzipFile(fastq_filepath))
         self.assertTrue(fq.check_file_size(50))
         self.assertFalse(fq.check_file_size(50000))

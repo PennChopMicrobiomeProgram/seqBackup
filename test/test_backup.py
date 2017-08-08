@@ -9,7 +9,7 @@ from seqBackupLib.backup import *
 class BackupTests(unittest.TestCase):
     def setUp(self):
         self.curr_dir = os.path.dirname(os.path.abspath(__file__))
-        self.fastq_filepath = os.path.join(self.curr_dir, "170323_M04734_0028_000000000-B2MVT/small_Undetermined_S0_L001_R1_001.fastq.gz")
+        self.fastq_filepath = os.path.join(self.curr_dir, "170323_M04734_0028_000000000-B2MVT/Undetermined_S0_L001_R1_001.fastq.gz")
         self.temp_out_dir = tempfile.mkdtemp(dir=self.curr_dir)
         self.sample_sheet_fp = os.path.join(self.curr_dir, "170323_M04734_0028_000000000-B2MVT/test_sample_sheet.txt")
 

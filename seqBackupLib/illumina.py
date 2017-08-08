@@ -10,7 +10,8 @@ class IlluminaFastq(object):
     def __init__(self, f):
         self.file = f
         self.fastq_info = self._parse_header()
-
+        self.folder_info = self._parse_folder()
+        
     def __str__(self):
         return "_".join([self.fastq_info["instrument"], 
                          self.fastq_info["run_number"], 
@@ -32,6 +33,20 @@ class IlluminaFastq(object):
         vals2 = dict((k, v) for k, v in zip(keys2, word2.split(":")))
 
         vals1.update(vals2)
+        return vals1
+
+    def _parse_folder(self):
+        print self.run_name
+        matches = re.match("(\\d{6})_([DM]\\d{5})_(\\d{4})_(.*)", self.run_name)
+        keys1 = ("date", "instrument", "run_number", "flowcell_id")
+        vals1 = dict((k, v) for k, v in zip(keys1, matches.groups()))
+
+        matches = re.match("Undetermined_S0_L00([1-8])_([RI])([12])_001.fastq.gz", os.path.basename(self.filepath))
+        keys2 = ("lane", "read_or_index", "read")
+        vals2 = dict((k, v) for k, v in zip(keys2, matches.groups()))
+        
+        vals1.update(vals2)
+        print(vals1)
         return vals1
 
     @property
@@ -57,8 +72,8 @@ class IlluminaFastq(object):
 
     @property
     def run_name(self):
-        dir_split = self.file.name.split(os.sep)
-        matches = [re.search("\\d{6}_[DM]\\d{5}_\\d{4}", d) for d in dir_split]
+        dir_split = self.filepath.split(os.sep)
+        matches = [re.match("\\d{6}_[DM]\\d{5}_\\d{4}", d) for d in dir_split]
         matches = [dir_split[i] for i, m in enumerate(matches) if m]
         if len(matches) != 1:
             raise ValueError("Could not find run name in directory: {0}".format(self.filepath))
