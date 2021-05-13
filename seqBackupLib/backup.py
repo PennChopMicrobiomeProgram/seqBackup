@@ -5,6 +5,7 @@ import stat
 import re
 import gzip
 import hashlib
+import warnings
 
 from seqBackupLib.illumina import IlluminaFastq
 
@@ -31,7 +32,7 @@ def return_md5(fname):
 
 def backup_fastq(forward_reads, dest_dir, sample_sheet_fp, has_index, min_file_size):
     
-    R1 = IlluminaFastq(gzip.GzipFile(forward_reads))    
+    R1 = IlluminaFastq(gzip.open(forward_reads, mode = 'rt'))    
 
     # build the strings for the required files    
     file_names_RI = build_fp_to_archive(forward_reads, has_index, R1.lane)
@@ -39,7 +40,7 @@ def backup_fastq(forward_reads, dest_dir, sample_sheet_fp, has_index, min_file_s
     # create the Illumina objects and check the files
     illumina_fastqs = []
     for fp in file_names_RI:
-        illumina_temp = IlluminaFastq(gzip.GzipFile(fp))
+        illumina_temp = IlluminaFastq(gzip.open(fp, mode = 'rt'))
         if not illumina_temp.check_fp_vs_content():
             raise ValueError("The file path and header infromation don't match")
         if not illumina_temp.check_file_size(min_file_size):

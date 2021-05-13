@@ -18,10 +18,10 @@ class BackupTests(unittest.TestCase):
 
     def test_build_fp_to_archive(self):
         list1 = build_fp_to_archive("Undetermined_S0_L001_R1_001.fastq.gz", True, "1")
-        self.assertItemsEqual(list1, ["Undetermined_S0_L001_R1_001.fastq.gz", "Undetermined_S0_L001_R2_001.fastq.gz", "Undetermined_S0_L001_I1_001.fastq.gz", "Undetermined_S0_L001_I2_001.fastq.gz"])
+        self.assertCountEqual(list1, ["Undetermined_S0_L001_R1_001.fastq.gz", "Undetermined_S0_L001_R2_001.fastq.gz", "Undetermined_S0_L001_I1_001.fastq.gz", "Undetermined_S0_L001_I2_001.fastq.gz"])
         
         list1 = build_fp_to_archive("Undetermined_S0_L001_R1_001.fastq.gz", False, "1")
-        self.assertItemsEqual(list1, ["Undetermined_S0_L001_R1_001.fastq.gz", "Undetermined_S0_L001_R2_001.fastq.gz"])
+        self.assertCountEqual(list1, ["Undetermined_S0_L001_R1_001.fastq.gz", "Undetermined_S0_L001_R2_001.fastq.gz"])
 
     def test_backup_fastq(self):
         has_index = True
@@ -29,7 +29,7 @@ class BackupTests(unittest.TestCase):
         backup_fastq(self.fastq_filepath, self.temp_out_dir, self.sample_sheet_fp, has_index, min_file_size)
         
         # check the md5sums of the first fastq is the same
-        fq = IlluminaFastq(gzip.GzipFile(self.fastq_filepath))
+        fq = IlluminaFastq(gzip.open(self.fastq_filepath, mode = 'rt'))
         out_fp = os.path.join(self.temp_out_dir, fq.build_archive_dir(), os.path.basename(self.fastq_filepath))
         md5_orj = return_md5(self.fastq_filepath)
         md5_trans = return_md5(out_fp)
