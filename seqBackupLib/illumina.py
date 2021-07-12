@@ -4,6 +4,7 @@ import re
 import warnings
 
 
+
 class IlluminaFastq(object):
     machine_types = {"D": "Illumina-HiSeq", "M": "Illumina-MiSeq", "A": "Illumina-NovaSeq","N": "MiniSeq"}
 
