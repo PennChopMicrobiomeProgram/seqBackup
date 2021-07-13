@@ -9,19 +9,19 @@ class IlluminaTests(unittest.TestCase):
     
     def test_illuminafastq(self):
         fastq_file = StringIO(
-            u"@M03543:47:C8LJ2ANXX:1:2209:1084:2044 1:N:0:NNNNNNNN+NNNNNNNN")
+            u"@NB551353:107:HWJFCAFX2:2:11101:23701:1033 1:N:0:CAAGACGTCC+NNNNTATACT")
         fastq_filepath = (
-            "Miseq/160511_M03543_0047_000000000-APE6Y/Data/Intensities/"
+            "incoming/210612_NB551353_0107_AHWJFCAFX2/Data/Intensities/"
             "BaseCalls/Undetermined_S0_L001_R1_001.fastq.gz")
-        folder_info = {"date":"160511", "instrument":"M03543", "run_number":"47", "flowcell_id":"000000000-APE6Y", "lane":"1", "read_or_index":"R", "read":"1"}
+        folder_info = {"date":"210612", "instrument":"NB551353", "run_number":"107", "flowcell_id":"AHWJFCAFX2", "lane":"1", "read_or_index":"R", "read":"1"}
         fastq_file.name = fastq_filepath
         fq = IlluminaFastq(fastq_file)
 
-        self.assertEqual(fq.machine_type, "Illumina-MiSeq")
-        self.assertEqual(fq.date, "2016-05-11")
+        self.assertEqual(fq.machine_type, "Illumina-MiniSeq")
+        self.assertEqual(fq.date, "2021-06-12")
         self.assertEqual(fq.lane, "1")
         self.assertEqual(fq.filepath, fastq_filepath)
-        self.assertEqual(fq.run_name, "160511_M03543_0047_000000000-APE6Y")
+        self.assertEqual(fq.run_name, "210612_NB551353_0107_AHWJFCAFX2")
 
         self.assertDictEqual(fq.folder_info, folder_info)
 
@@ -127,14 +127,14 @@ class IlluminaTests(unittest.TestCase):
 
     def test_build_archive_dir(self):
         # for MiSeq
-        fastq_file = StringIO(
-            u"@M03543:47:C8LJ2ANXX:1:2209:1084:2044 1:N:0:NNNNNNNN+NNNNNNNN")
+        fastq_file=StringIO(
+            u"NB551353:107:HWJFCAFX2:2:11101:23701:1033 1:N:0:CAAGACGTCC+NNNNTATACT")
         fastq_filepath = (
-            "Miseq/160511_M03543_0047_000000000-APE6Y/Data/Intensities/"
+            "icoming/210621_A00901_0361_BHFWM2DRXY/Data/Intensities/"
             "BaseCalls/Undetermined_S0_L001_R1_001.fastq.gz")
         fastq_file.name = fastq_filepath
         fq = IlluminaFastq(fastq_file)
-        self.assertEqual(fq.build_archive_dir(), "160511_M03543_0047_000000000-APE6Y_L001")
+        self.assertEqual(fq.build_archive_dir(), "210621_A00901_0361_BHFWM2DRXY_L001")
 
         # for HiSeq
         fastq_file = StringIO(
@@ -155,9 +155,9 @@ class IlluminaTests(unittest.TestCase):
 
     def test_is_same_run(self):
         fastq_file = StringIO(
-            u"@M03543:47:C8LJ2ANXX:1:2209:1084:2044 1:N:0:NNNNNNNN+NNNNNNNN")
+            u"@NB551353:107:HWJFCAFX2:2:11101:23701:1033 1:N:0:CAAGACGTCC+NNNNTATACT")
         fastq_filepath = (
-            "Miseq/160511_M03543_0047_000000000-APE6Y/Data/Intensities/"
+            "incoming/210612_NB551353_0107_AHWJFCAFX2/Data/Intensities/"
             "BaseCalls/Undetermined_S0_L001_R1_001.fastq.gz")
         fastq_file.name = fastq_filepath
         fq = IlluminaFastq(fastq_file)
