@@ -4,8 +4,9 @@ import re
 import warnings
 
 
+
 class IlluminaFastq(object):
-    machine_types = {"D": "Illumina-HiSeq", "M": "Illumina-MiSeq", "A": "Illumina-NovaSeq"}
+    machine_types = {"D": "Illumina-HiSeq", "M": "Illumina-MiSeq", "A": "Illumina-NovaSeq","N": "Illumina-MiniSeq"}
 
     def __init__(self, f):
         self.file = f
@@ -42,11 +43,11 @@ class IlluminaFastq(object):
         return vals1
 
     def _parse_folder(self):
-        matches = re.match("(\\d{6})_([DMA]\\d{5})_0*(\\d{1,4})_(.*)", self.run_name)
+        matches = re.match("(\\d{6})_([DMAN]B?\\d{5,6})_0*(\\d{1,4})_(.*)", self.run_name)
         keys1 = ("date", "instrument", "run_number", "flowcell_id")
         vals1 = dict((k, v) for k, v in zip(keys1, matches.groups()))
 
-        if self.machine_type == "Illumina-HiSeq" or self.machine_type == "Illumina-NovaSeq":
+        if self.machine_type == "Illumina-HiSeq" or self.machine_type == "Illumina-NovaSeq" or self.machine_type == "Illumina-MiniSeq":
             vals1["flowcell_id"] =  vals1["flowcell_id"][1:]
 
         matches = re.match("Undetermined_S0_L00([1-8])_([RI])([12])_001.fastq.gz", os.path.basename(self.filepath))
@@ -80,7 +81,7 @@ class IlluminaFastq(object):
     @property
     def run_name(self):
         dir_split = self.filepath.split(os.sep)
-        matches = [re.match("\\d{6}_[DMA]\\d{5}_\\d{4}", d) for d in dir_split]
+        matches = [re.match("\\d{6}_[DMAN]B?\\d{5,6}_\\d{4}", d) for d in dir_split]
         matches = [dir_split[i] for i, m in enumerate(matches) if m]
         if len(matches) != 1:
             raise ValueError("Could not find run name in directory: {0}".format(self.filepath))
