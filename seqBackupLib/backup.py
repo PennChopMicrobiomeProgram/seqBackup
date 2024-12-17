@@ -41,8 +41,9 @@ def backup_fastq(forward_reads, dest_dir, sample_sheet_fp, has_index, min_file_s
     illumina_fastqs = []
     for fp in file_names_RI:
         illumina_temp = IlluminaFastq(gzip.open(fp, mode = 'rt'))
-        if not illumina_temp.check_fp_vs_content():
-            raise ValueError("The file path and header infromation don't match")
+        if not illumina_temp.check_fp_vs_content()[0]:
+            print(illumina_temp.check_fp_vs_content()[1:])
+            raise ValueError("The file path and header information don't match")
         if not illumina_temp.check_file_size(min_file_size):
             raise ValueError("File {0} seems suspiciously small. Plese check if you have the correct file or lower the minimum file size threshold".format(fp))
         if not illumina_temp.check_index_read_exists():

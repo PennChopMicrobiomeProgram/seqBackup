@@ -6,7 +6,7 @@ import warnings
 
 
 class IlluminaFastq(object):
-    machine_types = {"D": "Illumina-HiSeq", "M": "Illumina-MiSeq", "A": "Illumina-NovaSeq","N": "Illumina-MiniSeq"}
+    machine_types = {"V": "Illumina-NextSeq", "D": "Illumina-HiSeq", "M": "Illumina-MiSeq", "A": "Illumina-NovaSeq","N": "Illumina-MiniSeq"}
 
     def __init__(self, f):
         self.file = f
@@ -43,7 +43,7 @@ class IlluminaFastq(object):
         return vals1
 
     def _parse_folder(self):
-        matches = re.match("(\\d{6})_([DMAN]B?\\d{5,6})_0*(\\d{1,4})_(.*)", self.run_name)
+        matches = re.match("(\\d{6})_([DMANV]B?H?\\d{5,6})_0*(\\d{1,4})_(.*)", self.run_name)
         keys1 = ("date", "instrument", "run_number", "flowcell_id")
         vals1 = dict((k, v) for k, v in zip(keys1, matches.groups()))
 
@@ -81,7 +81,8 @@ class IlluminaFastq(object):
     @property
     def run_name(self):
         dir_split = self.filepath.split(os.sep)
-        matches = [re.match("\\d{6}_[DMAN]B?\\d{5,6}_\\d{4}", d) for d in dir_split]
+        #return(dir_split[-2])
+        matches = [re.match("\\d{6}_[DMANV]B?H?\\d{5,6}_\\d{1,4}_[\\dA-Z]{9}", d) for d in dir_split]
         matches = [dir_split[i] for i, m in enumerate(matches) if m]
         if len(matches) != 1:
             raise ValueError("Could not find run name in directory: {0}".format(self.filepath))
@@ -96,7 +97,7 @@ class IlluminaFastq(object):
         flowcell_check = self.fastq_info["flowcell_id"] == self.folder_info["flowcell_id"]
         lane_check = self.lane == self.folder_info["lane"]
         read_check = self.fastq_info["read"] == self.folder_info["read"]
-        return (run_check and instrument_check and flowcell_check and lane_check and read_check)
+        return ([run_check and instrument_check and flowcell_check and lane_check and read_check, run_check, instrument_check, flowcell_check, lane_check, read_check, self.fastq_info["flowcell_id"], self.folder_info["flowcell_id"]])
     
     def check_file_size(self, min_file_size):
         return os.path.getsize(self.filepath) > min_file_size
