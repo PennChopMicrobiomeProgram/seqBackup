@@ -6,8 +6,10 @@ import re
 import gzip
 import hashlib
 import warnings
-
 from seqBackupLib.illumina import IlluminaFastq
+
+
+DEFAULT_MIN_FILE_SIZE = 500000000  # 500MB
 
 
 def build_fp_to_archive(file_name, has_index, lane):
@@ -132,7 +134,7 @@ def main(argv=None):
         "--min-file-size",
         required=False,
         type=int,
-        default=500000000,
+        default=DEFAULT_MIN_FILE_SIZE,
         help="Minimum file size to register in bytes",
     )
     args = parser.parse_args(argv)

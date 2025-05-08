@@ -1,6 +1,7 @@
 import gzip
 import pytest
 from pathlib import Path
+from seqBackupLib.backup import DEFAULT_MIN_FILE_SIZE
 from seqBackupLib.illumina import IlluminaFastq
 
 
@@ -17,13 +18,17 @@ def setup_illumina_dir(fp: Path, r1: str, r1_lines: list[str]) -> Path:
 @pytest.fixture
 def novaseq_dir(tmp_path) -> Path:
     return setup_illumina_dir(
-        tmp_path / "250101_A12345_0001_A1234",
+        tmp_path / "250218_A00901_1295_BHTKCGDRX5",
         "Undetermined_S0_L001_R1_001.fastq.gz",
         [
-            "@A12345:1:1234:1:1101:1078:1091 R1:Y:0:ATTACTCG\n",
-            "ACGT\n",
+            "@A00901:1295:HTKCGDRX5:1:2101:1054:1000 1:N:0:NAGTGTTAGG+CGGAACTAGC\n",
+            "GTAAAAAGCTAGATTTTCGCGATTTACCAGACGAACTANTNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN\n",
             "+\n",
-            "IIII\n",
+            "FFFFF,FFF:FFFFFF,FFFFFFFFFFFFFFFFFFFFF#,###############################################################################################################\n",
+            "@A00901:1295:HTKCGDRX5:1:2101:1090:1000 1:N:0:AATTCTTGGA+AAGTTGACAA\n",
+            "GCTGCAATATGCGCCAACAAAACCGGTGGATAAAAAGGTTTCGTAATATAGTCATCNCNGNCNTNTNCNANNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNATTTCTCCGC\n",
+            "+\n",
+            ",FFFFFFFF:FFFFFFFFFFFF::FFFFFFFFF,FFFFFFF:F::FFFFFFFFFF:#F#F#F#F#:#F#F#######################################################################FFFFFFFFFF\n",
         ],
     )
 
@@ -31,13 +36,17 @@ def novaseq_dir(tmp_path) -> Path:
 @pytest.fixture
 def hiseq_dir(tmp_path) -> Path:
     return setup_illumina_dir(
-        tmp_path / "250101_D12345_0001_A1234",
+        tmp_path / "201118_D00728_0139_ACD5C3ANXX",
         "Undetermined_S0_L001_R1_001.fastq.gz",
         [
-            "@D12345:1:1234:1:1101:1078:1091 R1:Y:0:ATTACTCG\n",
-            "ACGT\n",
+            "@D00728:139:CD5C3ANXX:1:1101:1228:2123 1:N:0:ATCTCAGG+CCTAGAGT\n",
+            "NTGCGCAGGGGGACCTGCACCGGCATCCCCTGTACCGGCGGGGCGCTCAGGCTGAATGCGCCGTCCTGCATCAGTACCGACTCCGGCTCGATGGCTTTATCCTGTCTCTTATACACATCTCCGAGC\n",
             "+\n",
-            "IIII\n",
+            "#:<>AE<EGGGGCGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGGEGGGGGGGGGGGGGGEGGGGDEGGGGGGGGGG;EGGGGGGEDDEGGGGGGGGGGGGGGBEGGDDDCDC\n",
+            "@D00728:139:CD5C3ANXX:1:1101:1176:2132 1:N:0:CTCTCTAC+TTCTAGCT\n",
+            "NATCTCGACCTTTTGGGTCAGTCCGTTTTTCGATTTATAAACCGCCGGCAATACACGGCTCTTGACATCCGATAATCCCGGAGACGCATGGACCGACAATGTCCCAATCCTGTCTCTTATACACAT\n",
+            "+\n",
+            "#<<>BGGGGGGGGGDDG=CGGGGF=FGGGGGGGGGGGGGGGGF<EG@EEGGCGGGGGGGGDGGGGEGGGGGGGDGGGGGBGGGGGGGGBGGGGEGGGGG77CEEE=GGG.DGDEGEGGB/8/CDB@\n",
         ],
     )
 
@@ -45,10 +54,10 @@ def hiseq_dir(tmp_path) -> Path:
 @pytest.fixture
 def novaseqx_dir(tmp_path) -> Path:
     return setup_illumina_dir(
-        tmp_path / "250101_LH12345_0001_A1234",
+        tmp_path / "20250429_LH00732_0028_A22YJWWLT3",
         "Undetermined_S0_L001_R1_001.fastq.gz",
         [
-            "@LH12345:1:1234:1:1101:1078:1091 R1:Y:0:ATTACTCG\n",
+            "@LH00732:28:22YJWWLT3:1:1101:1213:1080 1:N:0:CCTCCGTCCA+CACCGATGTG\n",
             "ACGT\n",
             "+\n",
             "IIII\n",
@@ -59,13 +68,17 @@ def novaseqx_dir(tmp_path) -> Path:
 @pytest.fixture
 def miseq_dir(tmp_path) -> Path:
     return setup_illumina_dir(
-        tmp_path / "250101_M12345_0028_000000000-B2MVT",
+        tmp_path / "250407_M03543_0443_000000000-DTHBL",
         "Undetermined_S0_L001_R1_001.fastq.gz",
         [
-            "@M12345:28:000000000-B2MVT:1:2106:17605:1940 1:N:0:TTTTTTTTTTTT+TCTTTCCCTACA\n",
-            "ACGT\n",
+            "@M03543:443:000000000-DTHBL:1:1101:16223:1348 1:N:0:TTTTTTTTTTTT+TTCTTTTTCCTT\n",
+            "TCTTCCCTCTTTCTTCTTTCTTCCTCCCTTCCCTTCTCTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTCTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT\n",
             "+\n",
-            "IIII\n",
+            ">>>>A1C1BB1B3A333BB33B311100BA000BBBE122B110A//AA/>//>///>///<<<//<<--<---:------9---99-999-9---9-99-99---9----9-9-999-9-9-9-----999--9--9--99-9/99/9/--99---999-9-999--9--999-9-9-9-99-9--9-999-99-999999999@>-9-99--99---999--999@999-9999@>---9------9-9\n",
+            "@M03543:443:000000000-DTHBL:1:1101:15497:1351 1:N:0:TTTTTTTTTTTT+TTCTTTTTCCTC\n",
+            "TCTTCCCTCTTTCTTCTTTCTTCCTCCCTTCCCTTCTCTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTCTCTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTCTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT\n",
+            "+\n",
+            ">>>>A1C1BB1B3B333BB33B311100BB000BBCD122B110A//AA/>//>///>////<<//<<--<-:-:-9--9-9---9--999--///9//9/99--------9-9-9999999-9-----999-----9--99-9/99/9/--99-9--99-9-999--9--9-9--9--9-99-9----999-99-9999999999@9--99--99---99---999@999--999=>---9------9-9\n",
         ],
     )
 
@@ -73,13 +86,17 @@ def miseq_dir(tmp_path) -> Path:
 @pytest.fixture
 def miniseq_dir(tmp_path) -> Path:
     return setup_illumina_dir(
-        tmp_path / "250101_N12345_0001_A1234",
+        tmp_path / "210612_NB551353_0107_AHWJFCAFX2",
         "Undetermined_S0_L001_R1_001.fastq.gz",
         [
-            "@N12345:1:1234:1:1101:1078:1091 R1:Y:0:ATTACTCG\n",
-            "ACGT\n",
+            "@NB551353:107:HWJFCAFX2:1:11101:1486:1048 1:N:0:TAATTAGCGT+NNNTTAACCA\n",
+            "GAAATNGACCGCCTCAATGAGGTTGCCAAGAATTTAAATGAATCTCTCATCGATCTCCAAGAACTTGGAAAGTA\n",
             "+\n",
-            "IIII\n",
+            "AAAAA#EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEAEEEEEEEEEEEEEEEAEEEEEEEEEEEEEEEE\n",
+            "@NB551353:107:HWJFCAFX2:1:11101:6713:1048 1:N:0:GAAGACTAGA+NNNTTCTAGT\n",
+            "GGCTANATCTGAGGACAAGAGGGCAAAAGTTACTAGTGCTATGCAGACAATGCTTTTCACTATGCTTAGAAAGT\n",
+            "+\n",
+            "AAAAA#EEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE\n",
         ],
     )
 
@@ -103,7 +120,7 @@ machine_fixtures = {
     "D": "hiseq_dir",
     "LH": "novaseqx_dir",
     "M": "miseq_dir",
-    "N": "miniseq_dir",
+    "NB": "miniseq_dir",
     "VH": "nextseq_dir",
 }
 
@@ -121,7 +138,8 @@ def test_illumina_fastq(machine_type, request):
     with gzip.open(fp / "Undetermined_S0_L001_R1_001.fastq.gz", "rt") as f:
         r1 = IlluminaFastq(f)
 
+    print("FASTQ info: ", r1.fastq_info, "\nFolder info: ", r1.folder_info)
     assert r1.machine_type == IlluminaFastq.MACHINE_TYPES[machine_type]
-    assert r1.check_fp_vs_content()[0]
-    assert not r1.check_file_size()
-    assert r1.check_file_size(1000)
+    assert r1.check_fp_vs_content()[0], r1.check_fp_vs_content()
+    assert not r1.check_file_size(DEFAULT_MIN_FILE_SIZE)
+    assert r1.check_file_size(100)

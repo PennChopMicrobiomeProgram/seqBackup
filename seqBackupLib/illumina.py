@@ -9,7 +9,7 @@ class IlluminaFastq:
         "D": "Illumina-HiSeq",
         "M": "Illumina-MiSeq",
         "A": "Illumina-NovaSeq",
-        "N": "Illumina-MiniSeq",
+        "NB": "Illumina-MiniSeq",
         "LH": "Illumina-NovaSeqX",
     }
 
@@ -77,7 +77,7 @@ class IlluminaFastq:
         vals1 = {
             "date": date,
             "instrument": instrument,
-            "run_number": run_number,
+            "run_number": str(int(run_number)),
             "flowcell_id": flowcell_id,
         }
 
