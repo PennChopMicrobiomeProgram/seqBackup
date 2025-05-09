@@ -28,7 +28,7 @@ jobs:
           python -m pip install .
 
       - name: Run tests
-        run: pytest -s -vvvv -l --tb=long tests
+        run: pytest -s -vvvv -l --tb=long test
 
   lint:
     name: Lint Code Base
