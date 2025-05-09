@@ -133,7 +133,7 @@ class IlluminaFastq:
     def build_archive_dir(self) -> str:
         return "_".join([self.run_name, "L{:0>3}".format(self.lane)])
 
-    def check_fp_vs_content(self) -> list[bool]:
+    def check_fp_vs_content(self, verbose: bool = False) -> list[bool]:
         run_check = self.fastq_info["run_number"] == self.folder_info["run_number"]
         instrument_check = (
             self.fastq_info["instrument"] == self.folder_info["instrument"]
@@ -143,6 +143,56 @@ class IlluminaFastq:
         )
         lane_check = self.lane == self.folder_info["lane"]
         read_check = self.fastq_info["read"] == self.folder_info["read"]
+
+        if verbose:
+            (
+                print(
+                    "Fastq run number: ",
+                    self.fastq_info["run_number"],
+                    "Folder run number: ",
+                    self.folder_info["run_number"],
+                )
+                if not run_check
+                else None
+            )
+            (
+                print(
+                    "Fastq instrument: ",
+                    self.fastq_info["instrument"],
+                    "Folder instrument: ",
+                    self.folder_info["instrument"],
+                )
+                if not instrument_check
+                else None
+            )
+            (
+                print(
+                    "Fastq flowcell id: ",
+                    self.fastq_info["flowcell_id"],
+                    "Folder flowcell id: ",
+                    self.folder_info["flowcell_id"],
+                )
+                if not flowcell_check
+                else None
+            )
+            (
+                print(
+                    "Fastq lane: ", self.lane, "Folder lane: ", self.folder_info["lane"]
+                )
+                if not lane_check
+                else None
+            )
+            (
+                print(
+                    "Fastq read: ",
+                    self.fastq_info["read"],
+                    "Folder read: ",
+                    self.folder_info["read"],
+                )
+                if not read_check
+                else None
+            )
+
         return [
             run_check
             and instrument_check
