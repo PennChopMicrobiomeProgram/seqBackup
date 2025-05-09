@@ -13,6 +13,6 @@ setup(
     author_email="ctanes@gmail.com",
     url="https://github.com/PennChopMicrobiomeProgram",
     packages=["seqBackupLib"],
-    scripts=["scripts/backup_illumina.py"],  # ,
-    # install_requires=["pandas", "biopython"]
+    scripts=["scripts/backup_illumina.py"],
+    python_requires=">=3.9",
 )
