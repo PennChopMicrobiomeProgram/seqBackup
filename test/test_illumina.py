@@ -2,7 +2,7 @@ import gzip
 import pytest
 from pathlib import Path
 from seqBackupLib.backup import DEFAULT_MIN_FILE_SIZE
-from seqBackupLib.illumina import IlluminaFastq, MACHINE_TYPES
+from seqBackupLib.illumina import IlluminaDir, IlluminaFastq, MACHINE_TYPES
 
 
 machine_fixtures = {
@@ -34,3 +34,16 @@ def test_illumina_fastq(machine_type, request):
     assert not r1.check_file_size(DEFAULT_MIN_FILE_SIZE)
     assert r1.check_file_size(100)
     assert r1.check_index_read_exists()
+
+
+@pytest.mark.parametrize("machine_type", MACHINE_TYPES.keys())
+def test_illumina_dir(machine_type, request):
+    fixture_name = machine_fixtures.get(machine_type)
+    if not fixture_name:
+        raise ValueError(
+            f"All supported machine types must be tested. Missing: {machine_type}"
+        )
+
+    fp = request.getfixturevalue(fixture_name)
+
+    d = IlluminaDir(fp.name)
