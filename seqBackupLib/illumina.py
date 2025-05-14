@@ -3,20 +3,75 @@ from io import TextIOWrapper
 from pathlib import Path
 
 
-class IlluminaFastq:
-    MACHINE_TYPES = {
-        "VH": "Illumina-NextSeq",
-        "D": "Illumina-HiSeq",
-        "M": "Illumina-MiSeq",
-        "A": "Illumina-NovaSeq",
-        "NB": "Illumina-MiniSeq",
-        "LH": "Illumina-NovaSeqX",
-    }
+MACHINE_TYPES = {
+    "VH": "Illumina-NextSeq",
+    "D": "Illumina-HiSeq",
+    "M": "Illumina-MiSeq",
+    "A": "Illumina-NovaSeq",
+    "NB": "Illumina-MiniSeq",
+    "LH": "Illumina-NovaSeqX",
+}
 
+
+def extract_instrument_code(instrument: str) -> str:
+    return "".join(filter(lambda x: not x.isdigit(), instrument))
+
+
+class IlluminaDir:
+    def __init__(self, run_name: str):
+        self.run_name = run_name
+        self.folder_info = self._parse_folder()
+
+    def _parse_folder(self) -> dict[str, str]:
+        # Extract directory name info
+        parts = self.run_name.split("_")
+
+        date = parts[0]
+        if len(date) == 8:
+            self.date = f"{date[0:4]}-{date[4:6]}-{date[6:8]}"
+        elif len(date) == 6:
+            self.date = f"20{date[0:2]}-{date[2:4]}-{date[4:6]}"
+        else:
+            raise ValueError(f"Invalid date format in run name: {date}")
+
+        instrument = parts[1]
+        if extract_instrument_code(instrument) not in MACHINE_TYPES:
+            raise ValueError(f"Invalid instrument code in run name: {instrument}")
+        self.machine_type = MACHINE_TYPES[extract_instrument_code(instrument)]
+
+        run_number = parts[2]
+        if not run_number.isdigit():
+            raise ValueError(f"Invalid run number in run name: {run_number}")
+
+        flowcell_id = parts[3]
+
+        if len(parts) > 4:
+            raise ValueError(f"Unexpected extra parts in run name: {parts[4:]}")
+
+        vals1 = {
+            "date": date,
+            "instrument": instrument,
+            "run_number": str(int(run_number)),
+            "flowcell_id": flowcell_id,
+        }
+
+        if (
+            self.machine_type == "Illumina-HiSeq"
+            or self.machine_type == "Illumina-NovaSeq"
+            or self.machine_type == "Illumina-MiniSeq"
+            or self.machine_type == "Illumina-NovaSeqX"
+        ):
+            vals1["flowcell_id"] = vals1["flowcell_id"][1:]
+
+        return vals1
+
+
+class IlluminaFastq:
     def __init__(self, f: TextIOWrapper):
         self.file = f
         self.fastq_info = self._parse_header()
-        self.folder_info = self._parse_folder()
+        self.folder_info = IlluminaDir(self.run_name).folder_info
+        self.folder_info.update(self._parse_fastq_file())
 
     def __str__(self):
         return "_".join(
@@ -49,46 +104,7 @@ class IlluminaFastq:
         vals1.update(vals2)
         return vals1
 
-    def _parse_folder(self) -> dict[str, str]:
-        # Extract directory name info
-        parts = self.run_name.split("_")
-
-        date = parts[0]
-        if len(date) == 8:
-            self.date = f"{date[0:4]}-{date[4:6]}-{date[6:8]}"
-        elif len(date) == 6:
-            self.date = f"20{date[0:2]}-{date[2:4]}-{date[4:6]}"
-        else:
-            raise ValueError(f"Invalid date format in run name: {date}")
-
-        instrument = parts[1]
-        if self._extract_instrument_code(instrument) not in self.MACHINE_TYPES:
-            raise ValueError(f"Invalid instrument code in run name: {instrument}")
-
-        run_number = parts[2]
-        if not run_number.isdigit():
-            raise ValueError(f"Invalid run number in run name: {run_number}")
-
-        flowcell_id = parts[3]
-
-        if len(parts) > 4:
-            raise ValueError(f"Unexpected extra parts in run name: {parts[4:]}")
-
-        vals1 = {
-            "date": date,
-            "instrument": instrument,
-            "run_number": str(int(run_number)),
-            "flowcell_id": flowcell_id,
-        }
-
-        if (
-            self.machine_type == "Illumina-HiSeq"
-            or self.machine_type == "Illumina-NovaSeq"
-            or self.machine_type == "Illumina-MiniSeq"
-            or self.machine_type == "Illumina-NovaSeqX"
-        ):
-            vals1["flowcell_id"] = vals1["flowcell_id"][1:]
-
+    def _parse_fastq_file(self) -> dict[str, str]:
         # Extract file name info
         matches = re.match(
             "Undetermined_S0_L00([1-8])_([RI])([12])_001.fastq.gz", self.filepath.name
@@ -96,18 +112,7 @@ class IlluminaFastq:
         keys2 = ("lane", "read_or_index", "read")
         vals2 = dict((k, v) for k, v in zip(keys2, matches.groups()))
 
-        vals1.update(vals2)
-        return vals1
-
-    @staticmethod
-    def _extract_instrument_code(instrument: str) -> str:
-        return "".join(filter(lambda x: not x.isdigit(), instrument))
-
-    @property
-    def machine_type(self):
-        return self.MACHINE_TYPES[
-            self._extract_instrument_code(self.fastq_info["instrument"])
-        ]
+        return vals2
 
     @property
     def lane(self) -> str:
@@ -118,13 +123,17 @@ class IlluminaFastq:
         return Path(self.file.name)
 
     @property
+    def machine_type(self) -> str:
+        return MACHINE_TYPES[extract_instrument_code(self.fastq_info["instrument"])]
+
+    @property
     def run_name(self) -> str:
         for part in self.filepath.parts:
             segments = part.split("_")
             if (
                 len(segments) >= 4
                 and segments[0].isdigit()
-                and self._extract_instrument_code(segments[1]) in self.MACHINE_TYPES
+                and extract_instrument_code(segments[1]) in MACHINE_TYPES
                 and segments[2].isdigit()
             ):
                 return part
