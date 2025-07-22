@@ -10,6 +10,7 @@ MACHINE_TYPES = {
     "A": "Illumina-NovaSeq",
     "NB": "Illumina-MiniSeq",
     "LH": "Illumina-NovaSeqX",
+    "SH": "Illumina-MiSeq",
 }
 
 
@@ -35,9 +36,10 @@ class IlluminaDir:
             raise ValueError(f"Invalid date format in run name: {date}")
 
         instrument = parts[1]
-        if extract_instrument_code(instrument) not in MACHINE_TYPES:
+        instrument_code = extract_instrument_code(instrument)
+        if instrument_code not in MACHINE_TYPES:
             raise ValueError(f"Invalid instrument code in run name: {instrument}")
-        self.machine_type = MACHINE_TYPES[extract_instrument_code(instrument)]
+        self.machine_type = MACHINE_TYPES[instrument_code]
 
         run_number = parts[2]
         if not run_number.isdigit():
@@ -55,12 +57,7 @@ class IlluminaDir:
             "flowcell_id": flowcell_id,
         }
 
-        if (
-            self.machine_type == "Illumina-HiSeq"
-            or self.machine_type == "Illumina-NovaSeq"
-            or self.machine_type == "Illumina-MiniSeq"
-            or self.machine_type == "Illumina-NovaSeqX"
-        ):
+        if instrument_code in {"D", "A", "NB", "LH", "SH"}:
             vals1["flowcell_id"] = vals1["flowcell_id"][1:]
 
         return vals1

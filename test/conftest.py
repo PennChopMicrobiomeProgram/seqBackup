@@ -119,6 +119,20 @@ def nextseq_dir(tmp_path) -> Path:
 
 
 @pytest.fixture
+def sh_dir(tmp_path) -> Path:
+    return setup_illumina_dir(
+        tmp_path / "20250610_SH00024_0006_ASC2107697-SC3",
+        "Undetermined_S0_L001_R1_001.fastq.gz",
+        [
+            "@SH00024:6:SC2107697-SC3:1:1101:18286:1000 1:N:0:ACGT+ACGT\n",
+            "ACGT\n",
+            "+\n",
+            "IIII\n",
+        ],
+    )
+
+
+@pytest.fixture
 def full_miseq_dir(tmp_path) -> Path:
     # Lane 1
     setup_illumina_dir(
