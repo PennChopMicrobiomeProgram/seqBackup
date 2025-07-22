@@ -12,6 +12,7 @@ machine_fixtures = {
     "M": "miseq_dir",
     "NB": "miniseq_dir",
     "VH": "nextseq_dir",
+    "SH": "sh_dir",
 }
 
 
