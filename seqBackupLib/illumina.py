@@ -106,10 +106,19 @@ class IlluminaFastq:
         matches = re.match(
             "Undetermined_S0_L00([1-8])_([RI])([12])_001.fastq.gz", self.filepath.name
         )
-        keys2 = ("lane", "read_or_index", "read")
-        vals2 = dict((k, v) for k, v in zip(keys2, matches.groups()))
+        if matches:
+            keys2 = ("lane", "read_or_index", "read")
+            return dict((k, v) for k, v in zip(keys2, matches.groups()))
 
-        return vals2
+        matches = re.match("Undetermined_S0_([RI])([12])_001.fastq.gz", self.filepath.name)
+        if matches:
+            return {
+                "lane": self.fastq_info["lane"],
+                "read_or_index": matches.group(1),
+                "read": matches.group(2),
+            }
+
+        raise ValueError(f"Unexpected FASTQ file name: {self.filepath.name}")
 
     @property
     def lane(self) -> str:

@@ -22,8 +22,11 @@ def build_fp_to_archive(fp: Path, has_index: bool, lane: str) -> list[Path]:
     if has_index:
         label.extend(["I1", "I2"])
 
-    rexp = "".join(["(L00", lane, "_)(R1)(_001.fastq.gz)$"])
-    modified_fp = [re.sub(rexp, "".join(["\\1", lab, "\\3"]), fp.name) for lab in label]
+    if "_L" in fp.name:
+        rexp = "".join(["(L00", lane, "_)(R1)(_001.fastq.gz)$"])
+        modified_fp = [re.sub(rexp, "".join(["\\1", lab, "\\3"]), fp.name) for lab in label]
+    else:
+        modified_fp = [fp.name.replace("R1", lab) for lab in label]
     return [fp] + [fp.parent / n for n in modified_fp]
 
 
@@ -87,16 +90,21 @@ def backup_fastq(
 
     # move the files to the archive location and remove permission
     permission = stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH
+    md5s = []
     for fp in RI_fps:
-        output_fp = write_dir / fp.name
+        if "_L" in fp.name:
+            dest_name = fp.name
+        else:
+            dest_name = fp.name.replace("_S0_", f"_S0_L{r1.lane.zfill(3)}_")
+        output_fp = write_dir / dest_name
         shutil.copyfile(fp, output_fp)
         output_fp.chmod(permission)
+        md5s.append((dest_name, return_md5(fp)))
 
     # copy the sample sheet to destination folder
     shutil.copyfile(sample_sheet_fp, write_dir / sample_sheet_fp.name)
 
     # write md5sums to a file
-    md5s = [(fp.name, return_md5(fp)) for fp in RI_fps]
     md5_out_fp = write_dir / ".".join([r1.build_archive_dir(), "md5"])
     with open(md5_out_fp, "w") as md5_out:
         [md5_out.write("\t".join(md5) + "\n") for md5 in md5s]

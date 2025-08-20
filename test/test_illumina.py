@@ -48,3 +48,13 @@ def test_illumina_dir(machine_type, request):
     fp = request.getfixturevalue(fixture_name)
 
     d = IlluminaDir(fp.name)
+
+
+def test_illumina_fastq_without_lane(novaseq_dir):
+    original = novaseq_dir / "Undetermined_S0_L001_R1_001.fastq.gz"
+    renamed = novaseq_dir / "Undetermined_S0_R1_001.fastq.gz"
+    original.rename(renamed)
+    with gzip.open(renamed, "rt") as f:
+        r1 = IlluminaFastq(f)
+    assert r1.check_fp_vs_content()[0]
+    assert r1.build_archive_dir().endswith("L001")
