@@ -1,6 +1,11 @@
 import pytest
 from pathlib import Path
-from seqBackupLib.backup import backup_fastq, build_fp_to_archive, return_md5
+from seqBackupLib.backup import (
+    backup_fastq,
+    build_fp_to_archive,
+    return_md5,
+    main,
+)
 
 
 def test_build_fp_to_archive():
@@ -104,3 +109,26 @@ def test_backup_fastq_without_lane(tmp_path, full_miseq_dir):
     out_dir = raw / "250407_M03543_0443_000000000-DTHBL_L001"
     assert (out_dir / "Undetermined_S0_L001_R1_001.fastq.gz").is_file()
     assert (out_dir / "Undetermined_S0_L001_R2_001.fastq.gz").is_file()
+
+
+def test_main_returns_archive_path(tmp_path, full_miseq_dir):
+    raw = tmp_path / "raw_reads"
+    raw.mkdir(parents=True, exist_ok=True)
+    sample_sheet_fp = full_miseq_dir / "sample_sheet.csv"
+
+    out_dir = main(
+        [
+            "--forward-reads",
+            str(full_miseq_dir / "Undetermined_S0_L001_R1_001.fastq.gz"),
+            "--destination-dir",
+            str(raw),
+            "--sample-sheet",
+            str(sample_sheet_fp),
+            "--min-file-size",
+            "100",
+        ]
+    )
+
+    expected_dir = raw / "250407_M03543_0443_000000000-DTHBL_L001"
+    assert out_dir == expected_dir
+    assert expected_dir.is_dir()

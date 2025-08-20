@@ -111,6 +111,8 @@ def backup_fastq(
     with open(md5_out_fp, "w") as md5_out:
         [md5_out.write("\t".join(md5) + "\n") for md5 in md5s]
 
+    return write_dir
+
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Backs up fastq files")
@@ -143,8 +145,7 @@ def main(argv=None):
         help="Minimum file size to register in bytes",
     )
     args = parser.parse_args(argv)
-
-    backup_fastq(
+    return backup_fastq(
         args.forward_reads,
         args.destination_dir,
         args.sample_sheet,
