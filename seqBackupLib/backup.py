@@ -24,7 +24,9 @@ def build_fp_to_archive(fp: Path, has_index: bool, lane: str) -> list[Path]:
 
     if "_L" in fp.name:
         rexp = "".join(["(L00", lane, "_)(R1)(_001.fastq.gz)$"])
-        modified_fp = [re.sub(rexp, "".join(["\\1", lab, "\\3"]), fp.name) for lab in label]
+        modified_fp = [
+            re.sub(rexp, "".join(["\\1", lab, "\\3"]), fp.name) for lab in label
+        ]
     else:
         modified_fp = [fp.name.replace("R1", lab) for lab in label]
     return [fp] + [fp.parent / n for n in modified_fp]
