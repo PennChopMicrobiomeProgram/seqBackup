@@ -103,22 +103,21 @@ class IlluminaFastq:
 
     def _parse_fastq_file(self) -> dict[str, str]:
         # Extract file name info
-        matches = re.match(
-            "Undetermined_S0_L00([1-8])_([RI])([12])_001.fastq.gz", self.filepath.name
-        )
-        if matches:
+        filename = self.filepath.name
+        if matches := re.match(
+            "Undetermined_S0_L00([1-8])_([RI])([12])_001.fastq.gz", filename
+        ):
             keys2 = ("lane", "read_or_index", "read")
-            return dict((k, v) for k, v in zip(keys2, matches.groups()))
+            return dict(zip(keys2, matches.groups()))
 
-        matches = re.match("Undetermined_S0_([RI])([12])_001.fastq.gz", self.filepath.name)
-        if matches:
+        if matches := re.match("Undetermined_S0_([RI])([12])_001.fastq.gz", filename):
             return {
                 "lane": self.fastq_info["lane"],
                 "read_or_index": matches.group(1),
                 "read": matches.group(2),
             }
 
-        raise ValueError(f"Unexpected FASTQ file name: {self.filepath.name}")
+        raise ValueError(f"Unexpected FASTQ file name: {filename}")
 
     @property
     def lane(self) -> str:
