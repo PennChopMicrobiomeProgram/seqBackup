@@ -121,11 +121,9 @@ def main(argv=None):
         help="The sample sheet associated with the run.",
     )
     parser.add_argument(
-        "--has-index",
-        required=False,
-        type=bool,
-        default=True,
-        help="Are index reads generated",
+        "--no-index",
+        action="store_true",
+        help="Skip index reads (I1/I2) during backup",
     )
     parser.add_argument(
         "--min-file-size",
@@ -140,7 +138,7 @@ def main(argv=None):
         args.forward_reads,
         args.destination_dir,
         args.sample_sheet,
-        args.has_index,
+        not args.no_index,
         args.min_file_size,
     )
 
