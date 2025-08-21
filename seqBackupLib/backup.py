@@ -41,6 +41,14 @@ def return_md5(fp: Path) -> str:
     return hash_md5.hexdigest()
 
 
+def check_backup(forward_reads: Path, dest_dir: Path) -> bool:
+    with gzip.open(forward_reads, mode="rt") as f:
+        r1 = IlluminaFastq(f)
+        archive_dir = dest_dir / r1.build_archive_dir()
+        md5_fp = archive_dir / f"{r1.build_archive_dir()}.md5"
+    return archive_dir.is_dir() and md5_fp.is_file()
+
+
 def backup_fastq(
     forward_reads: Path,
     dest_dir: Path,
@@ -144,7 +152,14 @@ def main(argv=None):
         default=DEFAULT_MIN_FILE_SIZE,
         help="Minimum file size to register in bytes",
     )
+    parser.add_argument(
+        "--check",
+        action="store_true",
+        help="Check if the target directory and md5 file exist without backing up",
+    )
     args = parser.parse_args(argv)
+    if args.check:
+        return check_backup(args.forward_reads, args.destination_dir)
     return backup_fastq(
         args.forward_reads,
         args.destination_dir,

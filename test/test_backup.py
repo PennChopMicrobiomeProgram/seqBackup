@@ -132,3 +132,34 @@ def test_main_returns_archive_path(tmp_path, full_miseq_dir):
     expected_dir = raw / "250407_M03543_0443_000000000-DTHBL_L001"
     assert out_dir == expected_dir
     assert expected_dir.is_dir()
+
+
+def test_main_check(tmp_path, full_miseq_dir):
+    raw = tmp_path / "raw_reads"
+    raw.mkdir(parents=True, exist_ok=True)
+    sample_sheet_fp = full_miseq_dir / "sample_sheet.csv"
+
+    base_args = [
+        "--forward-reads",
+        str(full_miseq_dir / "Undetermined_S0_L001_R1_001.fastq.gz"),
+        "--destination-dir",
+        str(raw),
+        "--sample-sheet",
+        str(sample_sheet_fp),
+        "--min-file-size",
+        "100",
+    ]
+
+    assert not main(base_args + ["--check"])
+
+    main(base_args)
+
+    assert main(base_args + ["--check"])
+
+    md5_fp = (
+        raw
+        / "250407_M03543_0443_000000000-DTHBL_L001"
+        / "250407_M03543_0443_000000000-DTHBL_L001.md5"
+    )
+    md5_fp.unlink()
+    assert not main(base_args + ["--check"])
