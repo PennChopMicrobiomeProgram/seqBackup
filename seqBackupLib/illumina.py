@@ -29,9 +29,9 @@ class IlluminaDir:
 
         date = parts[0]
         if len(date) == 8:
-            self.date = f"{date[0:4]}-{date[4:6]}-{date[6:8]}"
+            date = f"{date[0:4]}-{date[4:6]}-{date[6:8]}"
         elif len(date) == 6:
-            self.date = f"20{date[0:2]}-{date[2:4]}-{date[4:6]}"
+            date = f"20{date[0:2]}-{date[2:4]}-{date[4:6]}"
         else:
             raise ValueError(f"Invalid date format in run name: {date}")
 
