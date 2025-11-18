@@ -5,6 +5,7 @@ from seqBackupLib.backup import (
     build_fp_to_archive,
     return_md5,
     main,
+    verify_archive,
 )
 
 
@@ -132,3 +133,40 @@ def test_main_returns_archive_path(tmp_path, full_miseq_dir):
     expected_dir = raw / "250407_M03543_0443_000000000-DTHBL_L001"
     assert out_dir == expected_dir
     assert expected_dir.is_dir()
+
+
+def test_verify_archive(tmp_path, full_miseq_dir):
+    raw = tmp_path / "raw_reads"
+    raw.mkdir(parents=True, exist_ok=True)
+    sample_sheet_fp = full_miseq_dir / "sample_sheet.csv"
+
+    archive_dir = backup_fastq(
+        full_miseq_dir / "Undetermined_S0_L001_R1_001.fastq.gz",
+        raw,
+        sample_sheet_fp,
+        True,
+        100,
+    )
+
+    assert verify_archive(archive_dir)
+
+
+def test_verify_archive_detects_changes(tmp_path, full_miseq_dir):
+    raw = tmp_path / "raw_reads"
+    raw.mkdir(parents=True, exist_ok=True)
+    sample_sheet_fp = full_miseq_dir / "sample_sheet.csv"
+
+    archive_dir = backup_fastq(
+        full_miseq_dir / "Undetermined_S0_L001_R1_001.fastq.gz",
+        raw,
+        sample_sheet_fp,
+        True,
+        100,
+    )
+
+    target_fp = archive_dir / "Undetermined_S0_L001_R1_001.fastq.gz"
+    with open(target_fp, "ab") as f:
+        f.write(b"corruption")
+
+    with pytest.raises(ValueError):
+        verify_archive(archive_dir)
