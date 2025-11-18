@@ -90,8 +90,10 @@ def backup_fastq(
 
     ### All the checks are done and the files are safe to archive!
 
-    # move the files to the archive location and remove permission
-    permission = stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH
+    # move the files to the archive location and set readable permissions
+    # keep the files writable by the owner to allow intentional updates or tests
+    # that simulate corruption
+    permission = stat.S_IRUSR | stat.S_IWUSR | stat.S_IRGRP | stat.S_IROTH
     md5s = []
     for fp in RI_fps:
         if "_L" in fp.name:
