@@ -114,6 +114,48 @@ def backup_fastq(
     return write_dir
 
 
+def verify_archive(archive_dir: Path) -> bool:
+    md5_files = list(archive_dir.glob("*.md5"))
+    if not md5_files:
+        raise FileNotFoundError(f"No md5 file found in {archive_dir}")
+
+    if len(md5_files) > 1:
+        warnings.warn(
+            f"Multiple md5 files found in {archive_dir}. Using {md5_files[0].name}."
+        )
+
+    md5_fp = md5_files[0]
+    missing_files = []
+    mismatched_hashes = []
+
+    with open(md5_fp) as md5_file:
+        for line in md5_file:
+            expected = line.strip().split("\t")
+            if len(expected) != 2:
+                raise ValueError(f"Invalid md5 line in {md5_fp}: {line}")
+            filename, expected_md5 = expected
+            file_fp = archive_dir / filename
+
+            if not file_fp.is_file():
+                missing_files.append(filename)
+                continue
+
+            computed_md5 = return_md5(file_fp)
+            if computed_md5 != expected_md5:
+                mismatched_hashes.append((filename, expected_md5, computed_md5))
+
+    if missing_files or mismatched_hashes:
+        raise ValueError(
+            "MD5 verification failed",
+            {
+                "missing_files": missing_files,
+                "mismatched_hashes": mismatched_hashes,
+            },
+        )
+
+    return True
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Backs up fastq files")
 
@@ -154,3 +196,16 @@ def main(argv=None):
     )
 
     # maybe also ask for single or double reads
+
+
+def verify_main(argv=None):
+    parser = argparse.ArgumentParser(description="Verify md5 sums for an archived run")
+    parser.add_argument(
+        "--archive-dir",
+        required=True,
+        type=Path,
+        help="Archive directory containing the md5 checksum file and reads.",
+    )
+    args = parser.parse_args(argv)
+
+    return verify_archive(args.archive_dir)
