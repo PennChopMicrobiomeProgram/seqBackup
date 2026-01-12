@@ -1,11 +1,14 @@
 import pytest
 from pathlib import Path
-from seqBackupLib.backup import (
-    backup_fastq,
-    build_fp_to_archive,
-    return_md5,
-    main,
-)
+import gzip
+from seqBackupLib.backup import backup_fastq, build_fp_to_archive, return_md5, main
+
+
+def _write_fastq(fp: Path, header: str) -> None:
+    sequence = "N" * 10
+    content = f"{header}\n{sequence}\n+\n{'#' * len(sequence)}\n"
+    with gzip.open(fp, "wt") as handle:
+        handle.write(content)
 
 
 def test_build_fp_to_archive():
@@ -132,3 +135,47 @@ def test_main_returns_archive_path(tmp_path, full_miseq_dir):
     expected_dir = raw / "250407_M03543_0443_000000000-DTHBL_L001"
     assert out_dir == expected_dir
     assert expected_dir.is_dir()
+
+
+def test_allow_check_failures_continues_archive(tmp_path):
+    run_dir = tmp_path / "240101_M01234_0001_ABCDEFGX"
+    run_dir.mkdir(parents=True, exist_ok=True)
+    sample_sheet_fp = run_dir / "sample_sheet.csv"
+    sample_sheet_fp.write_text(
+        "[Header]\nIEMFileVersion,4\n[Data]\nSample_ID,Sample_Name\nS1,S1\n"
+    )
+
+    header = "@M01234:1:ZZZZZZ:1:1101:10000:10000 1:N:0:ATCACG"
+    for name in [
+        "Undetermined_S0_L001_R1_001.fastq.gz",
+        "Undetermined_S0_L001_R2_001.fastq.gz",
+        "Undetermined_S0_L001_I1_001.fastq.gz",
+        "Undetermined_S0_L001_I2_001.fastq.gz",
+    ]:
+        _write_fastq(run_dir / name, header)
+
+    raw = tmp_path / "raw_reads"
+    raw.mkdir(parents=True, exist_ok=True)
+
+    with pytest.raises(ValueError, match="header information don't match"):
+        backup_fastq(
+            run_dir / "Undetermined_S0_L001_R1_001.fastq.gz",
+            raw,
+            sample_sheet_fp,
+            True,
+            1,
+        )
+
+    with pytest.warns(UserWarning, match="header information don't match"):
+        out_dir = backup_fastq(
+            run_dir / "Undetermined_S0_L001_R1_001.fastq.gz",
+            raw,
+            sample_sheet_fp,
+            True,
+            1,
+            allow_check_failures=True,
+        )
+
+    assert out_dir.is_dir()
+    md5_fp = out_dir / f"{out_dir.name}.md5"
+    assert md5_fp.is_file()
