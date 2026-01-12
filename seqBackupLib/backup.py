@@ -47,6 +47,7 @@ def backup_fastq(
     sample_sheet_fp: Path,
     has_index: bool,
     min_file_size: int,
+    allow_check_failures: bool = False,
 ):
 
     R1 = IlluminaFastq(gzip.open(forward_reads, mode="rt"))
@@ -58,25 +59,47 @@ def backup_fastq(
     illumina_fastqs = [IlluminaFastq(gzip.open(fp, mode="rt")) for fp in RI_fps]
     r1 = illumina_fastqs[0]
 
-    if not all([ifq.check_fp_vs_content()[0] for ifq in illumina_fastqs]):
+    fp_vs_content_results = [ifq.check_fp_vs_content()[0] for ifq in illumina_fastqs]
+    if not all(fp_vs_content_results):
         [ifq.check_fp_vs_content(verbose=True) for ifq in illumina_fastqs]
-        raise ValueError(
+        message = (
             "The file path and header information don't match",
-            [str(ifq) for ifq in illumina_fastqs if not ifq.check_fp_vs_content()[0]],
+            [
+                str(ifq)
+                for ifq, ok in zip(illumina_fastqs, fp_vs_content_results)
+                if not ok
+            ],
         )
-    if not all([ifq.check_file_size(min_file_size) for ifq in illumina_fastqs]):
-        raise ValueError(
-            "File seems suspiciously small. Please check if you have the correct file or lower the minimum file size threshold",
-            [ifq.check_file_size(min_file_size) for ifq in illumina_fastqs],
+        if allow_check_failures:
+            warnings.warn(f"{message[0]}: {message[1]}")
+        else:
+            raise ValueError(*message)
+    file_size_results = [ifq.check_file_size(min_file_size) for ifq in illumina_fastqs]
+    if not all(file_size_results):
+        message = (
+            "File seems suspiciously small. Please check if you have the correct file or"
+            " lower the minimum file size threshold",
+            file_size_results,
         )
+        if allow_check_failures:
+            warnings.warn(f"{message[0]}: {message[1]}")
+        else:
+            raise ValueError(*message)
     if not all([ifq.check_index_read_exists() for ifq in illumina_fastqs]):
         warnings.warn(
             "No barcodes in headers. Were the fastq files generated properly?"
         )
 
     # parse the info from the headers in EACH file and check they are consistent within each other
-    if not all([fastq.is_same_run(illumina_fastqs[0]) for fastq in illumina_fastqs]):
-        raise ValueError("The files are not from the same run.")
+    same_run_results = [
+        fastq.is_same_run(illumina_fastqs[0]) for fastq in illumina_fastqs
+    ]
+    if not all(same_run_results):
+        message = "The files are not from the same run."
+        if allow_check_failures:
+            warnings.warn(message)
+        else:
+            raise ValueError(message)
 
     ## Archiving steps
 
@@ -144,6 +167,11 @@ def main(argv=None):
         default=DEFAULT_MIN_FILE_SIZE,
         help="Minimum file size to register in bytes",
     )
+    parser.add_argument(
+        "--allow-check-failures",
+        action="store_true",
+        help="Continue archiving even if validation checks fail",
+    )
     args = parser.parse_args(argv)
     return backup_fastq(
         args.forward_reads,
@@ -151,6 +179,7 @@ def main(argv=None):
         args.sample_sheet,
         not args.no_index,
         args.min_file_size,
+        args.allow_check_failures,
     )
 
     # maybe also ask for single or double reads
