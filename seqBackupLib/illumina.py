@@ -1,9 +1,13 @@
+import csv
 import re
+import warnings
 from io import TextIOWrapper
 from pathlib import Path
+from urllib.error import URLError
+from urllib.request import urlopen
 
 
-MACHINE_TYPES = {
+MACHINE_TYPES_FALLBACK = {
     "VH": "Illumina-NextSeq",
     "D": "Illumina-HiSeq",
     "M": "Illumina-MiSeq",
@@ -11,7 +15,62 @@ MACHINE_TYPES = {
     "NB": "Illumina-MiniSeq",
     "LH": "Illumina-NovaSeqX",
     "SH": "Illumina-MiSeq",
-}
+}  # Fallback mapping if machine_types.tsv is unavailable.
+MACHINE_TYPES_URL = (
+    "https://raw.githubusercontent.com/PennChopMicrobiomeProgram/"
+    "SampleRegistry/master/sample_registry/data/machine_types.tsv"
+)
+_machine_types_cache: dict[str, str] | None = None
+
+
+def load_machine_types() -> dict[str, str]:
+    global _machine_types_cache
+    if _machine_types_cache is not None:
+        return _machine_types_cache
+
+    try:
+        with urlopen(MACHINE_TYPES_URL, timeout=10) as response:
+            content = response.read().decode("utf-8")
+    except (URLError, TimeoutError) as exc:
+        warnings.warn(
+            f"Falling back to bundled machine types; unable to load {MACHINE_TYPES_URL}: {exc}",
+            RuntimeWarning,
+        )
+        _machine_types_cache = MACHINE_TYPES_FALLBACK
+        return _machine_types_cache
+
+    reader = csv.reader(content.splitlines(), delimiter="\t")
+    rows = [row for row in reader if row]
+    if not rows:
+        warnings.warn(
+            "Falling back to bundled machine types; received empty machine_types.tsv.",
+            RuntimeWarning,
+        )
+        _machine_types_cache = MACHINE_TYPES_FALLBACK
+        return _machine_types_cache
+
+    if rows[0][0].lower() in {"instrument_code", "code"}:
+        rows = rows[1:]
+
+    mapping: dict[str, str] = {}
+    for row in rows:
+        if len(row) < 2:
+            continue
+        code = row[0].strip()
+        machine_type = row[1].strip()
+        if code and machine_type:
+            mapping[code] = machine_type
+
+    if not mapping:
+        warnings.warn(
+            "Falling back to bundled machine types; no valid rows in machine_types.tsv.",
+            RuntimeWarning,
+        )
+        _machine_types_cache = MACHINE_TYPES_FALLBACK
+        return _machine_types_cache
+
+    _machine_types_cache = mapping
+    return _machine_types_cache
 
 
 def extract_instrument_code(instrument: str) -> str:
@@ -37,9 +96,10 @@ class IlluminaDir:
 
         instrument = parts[1]
         instrument_code = extract_instrument_code(instrument)
-        if instrument_code not in MACHINE_TYPES:
+        machine_types = load_machine_types()
+        if instrument_code not in machine_types:
             raise ValueError(f"Invalid instrument code in run name: {instrument}")
-        self.machine_type = MACHINE_TYPES[instrument_code]
+        self.machine_type = machine_types[instrument_code]
 
         run_number = parts[2]
         if not run_number.isdigit():
@@ -129,7 +189,8 @@ class IlluminaFastq:
 
     @property
     def machine_type(self) -> str:
-        return MACHINE_TYPES[extract_instrument_code(self.fastq_info["instrument"])]
+        machine_types = load_machine_types()
+        return machine_types[extract_instrument_code(self.fastq_info["instrument"])]
 
     @property
     def run_name(self) -> str:
@@ -138,7 +199,7 @@ class IlluminaFastq:
             if (
                 len(segments) >= 4
                 and segments[0].isdigit()
-                and extract_instrument_code(segments[1]) in MACHINE_TYPES
+                and extract_instrument_code(segments[1]) in load_machine_types()
                 and segments[2].isdigit()
             ):
                 return part
