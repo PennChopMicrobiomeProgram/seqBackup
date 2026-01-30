@@ -1,9 +1,13 @@
+import csv
 import re
+import warnings
 from io import TextIOWrapper
 from pathlib import Path
+from urllib.error import URLError
+from urllib.request import urlopen
 
 
-MACHINE_TYPES = {
+MACHINE_TYPES_FALLBACK = {
     "VH": "Illumina-NextSeq",
     "D": "Illumina-HiSeq",
     "M": "Illumina-MiSeq",
@@ -11,7 +15,31 @@ MACHINE_TYPES = {
     "NB": "Illumina-MiniSeq",
     "LH": "Illumina-NovaSeqX",
     "SH": "Illumina-MiSeq",
-}
+}  # Fallback mapping if machine_types.tsv is unavailable.
+MACHINE_TYPES_URL = (
+    "https://raw.githubusercontent.com/PennChopMicrobiomeProgram/"
+    "SampleRegistry/master/sample_registry/data/machine_types.tsv"
+)
+try:
+    with urlopen(MACHINE_TYPES_URL, timeout=10) as response:
+        rows = list(
+            csv.reader(response.read().decode("utf-8").splitlines(), delimiter="\t")
+        )
+    if rows and rows[0] and rows[0][0].lower() in {"instrument_code", "code"}:
+        rows = rows[1:]
+    MACHINE_TYPES = {
+        row[0].strip(): row[1].strip()
+        for row in rows
+        if len(row) >= 2 and row[0].strip() and row[1].strip()
+    }
+    if not MACHINE_TYPES:
+        raise ValueError("machine_types.tsv contained no usable rows")
+except (URLError, TimeoutError, ValueError) as exc:
+    warnings.warn(
+        f"Falling back to bundled machine types; unable to load {MACHINE_TYPES_URL}: {exc}",
+        RuntimeWarning,
+    )
+    MACHINE_TYPES = MACHINE_TYPES_FALLBACK
 
 
 def extract_instrument_code(instrument: str) -> str:
