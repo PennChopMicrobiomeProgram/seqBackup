@@ -1,6 +1,7 @@
 import csv
 import re
 import warnings
+from collections.abc import Mapping
 from io import TextIOWrapper
 from pathlib import Path
 from urllib.error import URLError
@@ -21,6 +22,20 @@ MACHINE_TYPES_URL = (
     "SampleRegistry/master/sample_registry/data/machine_types.tsv"
 )
 _machine_types_cache: dict[str, str] | None = None
+
+
+class MachineTypesMapping(Mapping):
+    def _mapping(self) -> dict[str, str]:
+        return load_machine_types()
+
+    def __getitem__(self, key: str) -> str:
+        return self._mapping()[key]
+
+    def __iter__(self):
+        return iter(self._mapping())
+
+    def __len__(self) -> int:
+        return len(self._mapping())
 
 
 def load_machine_types() -> dict[str, str]:
@@ -73,6 +88,9 @@ def load_machine_types() -> dict[str, str]:
     return _machine_types_cache
 
 
+MACHINE_TYPES = MachineTypesMapping()
+
+
 def extract_instrument_code(instrument: str) -> str:
     return "".join(filter(lambda x: not x.isdigit(), instrument))
 
@@ -96,10 +114,9 @@ class IlluminaDir:
 
         instrument = parts[1]
         instrument_code = extract_instrument_code(instrument)
-        machine_types = load_machine_types()
-        if instrument_code not in machine_types:
+        if instrument_code not in MACHINE_TYPES:
             raise ValueError(f"Invalid instrument code in run name: {instrument}")
-        self.machine_type = machine_types[instrument_code]
+        self.machine_type = MACHINE_TYPES[instrument_code]
 
         run_number = parts[2]
         if not run_number.isdigit():
@@ -189,8 +206,7 @@ class IlluminaFastq:
 
     @property
     def machine_type(self) -> str:
-        machine_types = load_machine_types()
-        return machine_types[extract_instrument_code(self.fastq_info["instrument"])]
+        return MACHINE_TYPES[extract_instrument_code(self.fastq_info["instrument"])]
 
     @property
     def run_name(self) -> str:
@@ -199,7 +215,7 @@ class IlluminaFastq:
             if (
                 len(segments) >= 4
                 and segments[0].isdigit()
-                and extract_instrument_code(segments[1]) in load_machine_types()
+                and extract_instrument_code(segments[1]) in MACHINE_TYPES
                 and segments[2].isdigit()
             ):
                 return part

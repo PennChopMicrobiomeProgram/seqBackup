@@ -1,8 +1,16 @@
 import gzip
+from urllib.error import URLError
+
 import pytest
-from pathlib import Path
+
 from seqBackupLib.backup import DEFAULT_MIN_FILE_SIZE
-from seqBackupLib.illumina import IlluminaDir, IlluminaFastq, MACHINE_TYPES
+from seqBackupLib.illumina import (
+    IlluminaDir,
+    IlluminaFastq,
+    MACHINE_TYPES,
+    MACHINE_TYPES_FALLBACK,
+    load_machine_types,
+)
 
 
 machine_fixtures = {
@@ -16,7 +24,14 @@ machine_fixtures = {
 }
 
 
-@pytest.mark.parametrize("machine_type", MACHINE_TYPES.keys())
+@pytest.fixture(autouse=True)
+def machine_types_cache(monkeypatch):
+    monkeypatch.setattr(
+        "seqBackupLib.illumina._machine_types_cache", MACHINE_TYPES_FALLBACK
+    )
+
+
+@pytest.mark.parametrize("machine_type", machine_fixtures.keys())
 def test_illumina_fastq(machine_type, request):
     fixture_name = machine_fixtures.get(machine_type)
     if not fixture_name:
@@ -37,7 +52,7 @@ def test_illumina_fastq(machine_type, request):
     assert r1.check_index_read_exists()
 
 
-@pytest.mark.parametrize("machine_type", MACHINE_TYPES.keys())
+@pytest.mark.parametrize("machine_type", machine_fixtures.keys())
 def test_illumina_dir(machine_type, request):
     fixture_name = machine_fixtures.get(machine_type)
     if not fixture_name:
@@ -58,3 +73,40 @@ def test_illumina_fastq_without_lane(novaseq_dir):
         r1 = IlluminaFastq(f)
     assert r1.check_fp_vs_content()[0]
     assert r1.build_archive_dir().endswith("L001")
+
+
+def test_load_machine_types_from_tsv(monkeypatch):
+    tsv = "instrument_code\tmachine_type\nZZ\tIllumina-Test\n"
+
+    class FakeResponse:
+        def __init__(self, data: str):
+            self._data = data
+
+        def read(self):
+            return self._data.encode("utf-8")
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+    monkeypatch.setattr(
+        "seqBackupLib.illumina.urlopen", lambda *args, **kwargs: FakeResponse(tsv)
+    )
+    monkeypatch.setattr("seqBackupLib.illumina._machine_types_cache", None)
+
+    machine_types = load_machine_types()
+    assert machine_types["ZZ"] == "Illumina-Test"
+
+
+def test_load_machine_types_fallback_warning(monkeypatch):
+    def raise_url_error(*args, **kwargs):
+        raise URLError("network down")
+
+    monkeypatch.setattr("seqBackupLib.illumina.urlopen", raise_url_error)
+    monkeypatch.setattr("seqBackupLib.illumina._machine_types_cache", None)
+
+    with pytest.warns(RuntimeWarning, match="Falling back to bundled machine types"):
+        machine_types = load_machine_types()
+    assert machine_types == MACHINE_TYPES_FALLBACK
