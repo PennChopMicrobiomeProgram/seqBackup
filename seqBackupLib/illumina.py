@@ -2,6 +2,7 @@ import csv
 import re
 import warnings
 from collections.abc import Mapping
+from typing import Optional
 from io import TextIOWrapper
 from pathlib import Path
 from urllib.error import URLError
@@ -21,7 +22,7 @@ MACHINE_TYPES_URL = (
     "https://raw.githubusercontent.com/PennChopMicrobiomeProgram/"
     "SampleRegistry/master/sample_registry/data/machine_types.tsv"
 )
-_machine_types_cache: dict[str, str] | None = None
+_machine_types_cache: Optional[dict[str, str]] = None
 
 
 class MachineTypesMapping(Mapping):
