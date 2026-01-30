@@ -25,9 +25,28 @@ machine_fixtures = {
 
 
 @pytest.fixture(autouse=True)
-def machine_types_cache(monkeypatch):
+def machine_types_urlopen(monkeypatch):
+    tsv_rows = ["instrument_code\tmachine_type"]
+    tsv_rows.extend(
+        f"{code}\t{machine}" for code, machine in MACHINE_TYPES_FALLBACK.items()
+    )
+    tsv = "\n".join(tsv_rows) + "\n"
+
+    class FakeResponse:
+        def __init__(self, data: str):
+            self._data = data
+
+        def read(self):
+            return self._data.encode("utf-8")
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
     monkeypatch.setattr(
-        "seqBackupLib.illumina._machine_types_cache", MACHINE_TYPES_FALLBACK
+        "seqBackupLib.illumina.urlopen", lambda *args, **kwargs: FakeResponse(tsv)
     )
 
 
@@ -94,7 +113,6 @@ def test_load_machine_types_from_tsv(monkeypatch):
     monkeypatch.setattr(
         "seqBackupLib.illumina.urlopen", lambda *args, **kwargs: FakeResponse(tsv)
     )
-    monkeypatch.setattr("seqBackupLib.illumina._machine_types_cache", None)
 
     machine_types = load_machine_types()
     assert machine_types["ZZ"] == "Illumina-Test"
@@ -105,7 +123,6 @@ def test_load_machine_types_fallback_warning(monkeypatch):
         raise URLError("network down")
 
     monkeypatch.setattr("seqBackupLib.illumina.urlopen", raise_url_error)
-    monkeypatch.setattr("seqBackupLib.illumina._machine_types_cache", None)
 
     with pytest.warns(RuntimeWarning, match="Falling back to bundled machine types"):
         machine_types = load_machine_types()

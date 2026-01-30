@@ -2,7 +2,6 @@ import csv
 import re
 import warnings
 from collections.abc import Mapping
-from typing import Optional
 from io import TextIOWrapper
 from pathlib import Path
 from urllib.error import URLError
@@ -22,7 +21,6 @@ MACHINE_TYPES_URL = (
     "https://raw.githubusercontent.com/PennChopMicrobiomeProgram/"
     "SampleRegistry/master/sample_registry/data/machine_types.tsv"
 )
-_machine_types_cache: Optional[dict[str, str]] = None
 
 
 class MachineTypesMapping(Mapping):
@@ -40,10 +38,6 @@ class MachineTypesMapping(Mapping):
 
 
 def load_machine_types() -> dict[str, str]:
-    global _machine_types_cache
-    if _machine_types_cache is not None:
-        return _machine_types_cache
-
     try:
         with urlopen(MACHINE_TYPES_URL, timeout=10) as response:
             content = response.read().decode("utf-8")
@@ -52,8 +46,7 @@ def load_machine_types() -> dict[str, str]:
             f"Falling back to bundled machine types; unable to load {MACHINE_TYPES_URL}: {exc}",
             RuntimeWarning,
         )
-        _machine_types_cache = MACHINE_TYPES_FALLBACK
-        return _machine_types_cache
+        return MACHINE_TYPES_FALLBACK
 
     reader = csv.reader(content.splitlines(), delimiter="\t")
     rows = [row for row in reader if row]
@@ -62,8 +55,7 @@ def load_machine_types() -> dict[str, str]:
             "Falling back to bundled machine types; received empty machine_types.tsv.",
             RuntimeWarning,
         )
-        _machine_types_cache = MACHINE_TYPES_FALLBACK
-        return _machine_types_cache
+        return MACHINE_TYPES_FALLBACK
 
     if rows[0][0].lower() in {"instrument_code", "code"}:
         rows = rows[1:]
@@ -82,11 +74,9 @@ def load_machine_types() -> dict[str, str]:
             "Falling back to bundled machine types; no valid rows in machine_types.tsv.",
             RuntimeWarning,
         )
-        _machine_types_cache = MACHINE_TYPES_FALLBACK
-        return _machine_types_cache
+        return MACHINE_TYPES_FALLBACK
 
-    _machine_types_cache = mapping
-    return _machine_types_cache
+    return mapping
 
 
 MACHINE_TYPES = MachineTypesMapping()
