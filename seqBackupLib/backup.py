@@ -9,7 +9,6 @@ import warnings
 from pathlib import Path
 from seqBackupLib.illumina import IlluminaFastq
 
-
 DEFAULT_MIN_FILE_SIZE = 500000000  # 500MB
 
 

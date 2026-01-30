@@ -6,7 +6,6 @@ from pathlib import Path
 from urllib.error import URLError
 from urllib.request import urlopen
 
-
 MACHINE_TYPES_FALLBACK = {
     "VH": "Illumina-NextSeq",
     "D": "Illumina-HiSeq",

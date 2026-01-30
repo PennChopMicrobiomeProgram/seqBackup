@@ -6,7 +6,6 @@ import pytest
 
 from seqBackupLib.backup import DEFAULT_MIN_FILE_SIZE
 
-
 machine_fixtures = {
     "A": "novaseq_dir",
     "D": "hiseq_dir",
