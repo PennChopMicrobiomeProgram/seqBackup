@@ -15,6 +15,7 @@ homepage = "https://github.com/PennChopMicrobiomeProgram"
 
 [project.scripts]
 backup_illumina = "seqBackupLib.backup:main"
+backup_nanopore = "seqBackupLib.backup_nanopore:main"
 
 [tool.setuptools.packages.find]
 where = ["."]
