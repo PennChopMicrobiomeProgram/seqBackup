@@ -34,7 +34,7 @@ def test_find_fastq_groups_barcoded(minion_dir):
 
 def test_find_fastq_groups_non_barcoded(non_barcoded_nanopore_dir):
     groups = find_fastq_groups(non_barcoded_nanopore_dir / "fastq_pass")
-    assert set(groups) == {"fastq_pass"}
+    assert set(groups) == {None}
 
 
 def test_backup_nanopore_archives_reads_and_reports(tmp_path, minion_dir):
@@ -45,9 +45,10 @@ def test_backup_nanopore_archives_reads_and_reports(tmp_path, minion_dir):
     assert out_dir == dest / minion_dir.name
     assert out_dir.is_dir()
 
-    # one concatenated file per barcode, each holding all 3 single-read chunks
+    # the fastq_pass/<barcode>/ layout is preserved, one concatenated file per
+    # barcode folder (each holding all 3 single-read chunks)
     for barcode in ("barcode01", "barcode02", "unclassified"):
-        fq = out_dir / f"{barcode}.fastq.gz"
+        fq = out_dir / "fastq_pass" / barcode / f"{barcode}.fastq.gz"
         assert fq.is_file()
         assert _count_records(fq) == 3
 
@@ -65,29 +66,30 @@ def test_backup_nanopore_archives_reads_and_reports(tmp_path, minion_dir):
     assert not (out_dir / ".Rhistory").exists()
     assert not (out_dir / "sequencing_summary_FBE92725_x.txt").exists()
 
-    # md5 manifest covers every concatenated fastq
+    # md5 manifest covers every concatenated fastq, keyed by archive-relative path
     md5_fp = out_dir / f"{minion_dir.name}.md5"
     assert md5_fp.is_file()
     entries = dict(line.split("\t") for line in md5_fp.read_text().splitlines() if line)
     assert set(entries) == {
-        "barcode01.fastq.gz",
-        "barcode02.fastq.gz",
-        "unclassified.fastq.gz",
+        "fastq_pass/barcode01/barcode01.fastq.gz",
+        "fastq_pass/barcode02/barcode02.fastq.gz",
+        "fastq_pass/unclassified/unclassified.fastq.gz",
     }
-    assert entries["barcode01.fastq.gz"].strip() == return_md5(
-        out_dir / "barcode01.fastq.gz"
+    bc01 = out_dir / "fastq_pass" / "barcode01" / "barcode01.fastq.gz"
+    assert entries["fastq_pass/barcode01/barcode01.fastq.gz"].strip() == return_md5(
+        bc01
     )
 
     # archived fastqs are read-only
-    mode = stat.S_IMODE(os.stat(out_dir / "barcode01.fastq.gz").st_mode)
-    assert not (mode & stat.S_IWUSR)
+    assert not (stat.S_IMODE(os.stat(bc01).st_mode) & stat.S_IWUSR)
 
 
 def test_backup_nanopore_non_barcoded(tmp_path, non_barcoded_nanopore_dir):
     dest = tmp_path / "archive"
     out_dir = backup_nanopore(non_barcoded_nanopore_dir, dest, min_total_size=1)
-    assert (out_dir / "fastq_pass.fastq.gz").is_file()
-    assert _count_records(out_dir / "fastq_pass.fastq.gz") == 3
+    fq = out_dir / "fastq_pass" / "FBE92725.fastq.gz"
+    assert fq.is_file()
+    assert _count_records(fq) == 3
 
 
 def test_backup_nanopore_refuses_existing_archive(tmp_path, minion_dir):
@@ -149,7 +151,7 @@ def test_main_returns_archive_path(tmp_path, p2i_dir):
     )
     assert out_dir == dest / p2i_dir.name
     assert out_dir.is_dir()
-    assert (out_dir / "barcode01.fastq.gz").is_file()
+    assert (out_dir / "fastq_pass" / "barcode01" / "barcode01.fastq.gz").is_file()
 
 
 def test_destination_dir_defaults_to_raw_data(monkeypatch, tmp_path, minion_dir):

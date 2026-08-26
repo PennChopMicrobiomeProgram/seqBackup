@@ -44,15 +44,15 @@ def return_md5(fp: Path) -> str:
     return hash_md5.hexdigest()
 
 
-def find_fastq_groups(fastq_pass_dir: Path) -> dict[str, list[Path]]:
-    """Map an output name to the ordered list of fastq.gz chunks to concatenate.
+def find_fastq_groups(fastq_pass_dir: Path) -> dict[str | None, list[Path]]:
+    """Map a barcode subdirectory name to its ordered list of fastq.gz chunks.
 
     A multiplexed run has ``fastq_pass/barcode01/``, ``fastq_pass/unclassified/``
-    etc., each holding many chunk files -> one output file per subdirectory.  A
-    non-multiplexed run drops the chunks straight into ``fastq_pass/`` -> a
-    single ``fastq_pass.fastq.gz`` output.
+    etc., each holding many chunk files -> keyed by the subdirectory name.  A
+    non-multiplexed run drops the chunks straight into ``fastq_pass/`` -> keyed
+    by ``None``.
     """
-    groups: dict[str, list[Path]] = {}
+    groups: dict[str | None, list[Path]] = {}
 
     for subdir in sorted(d for d in fastq_pass_dir.iterdir() if d.is_dir()):
         chunks = sorted(subdir.glob("*.fastq.gz"), key=natural_sort_key)
@@ -61,7 +61,7 @@ def find_fastq_groups(fastq_pass_dir: Path) -> dict[str, list[Path]]:
 
     top_level = sorted(fastq_pass_dir.glob("*.fastq.gz"), key=natural_sort_key)
     if top_level:
-        groups.setdefault(FASTQ_PASS_DIRNAME, top_level)
+        groups.setdefault(None, top_level)
 
     return groups
 
@@ -82,10 +82,22 @@ def concatenate_gzips(chunks: list[Path], dest: Path) -> str:
     return hash_md5.hexdigest()
 
 
-def _expected_barcode(stem: str) -> str | None:
-    if stem == "unclassified" or stem.startswith("barcode"):
-        return stem
+def _expected_barcode(group: str | None) -> str | None:
+    if group is not None and (group == "unclassified" or group.startswith("barcode")):
+        return group
     return None
+
+
+def _archive_relpath(group: str | None, flowcell_id: str) -> Path:
+    """Where a group's concatenated fastq lands inside the archive.
+
+    Barcode subdirectories are preserved (the ONT tools expect
+    ``fastq_pass/<barcode>/*.fastq.gz``); an un-subdivided run gets one file
+    directly under ``fastq_pass/``.
+    """
+    if group is None:
+        return Path(FASTQ_PASS_DIRNAME) / f"{flowcell_id}.fastq.gz"
+    return Path(FASTQ_PASS_DIRNAME) / group / f"{group}.fastq.gz"
 
 
 def backup_nanopore(
@@ -122,21 +134,25 @@ def backup_nanopore(
         header_failures: list[tuple[str, dict]] = []
         total_size = 0
 
-        for stem, chunks in groups.items():
-            out_fp = staging / f"{stem}.fastq.gz"
+        flowcell_id = nd.folder_info["flowcell_id"]
+        for group, chunks in groups.items():
+            rel_path = _archive_relpath(group, flowcell_id)
+            out_fp = staging / rel_path
+            out_fp.parent.mkdir(parents=True, exist_ok=True)
+
             digest = concatenate_gzips(chunks, out_fp)
             total_size += out_fp.stat().st_size
-            md5s.append((out_fp.name, digest))
+            md5s.append((rel_path.as_posix(), digest))
 
             with gzip.open(out_fp, "rt") as handle:
                 nf = NanoporeFastq(
                     handle,
-                    expected_flowcell=nd.folder_info["flowcell_id"],
-                    expected_barcode=_expected_barcode(stem),
+                    expected_flowcell=flowcell_id,
+                    expected_barcode=_expected_barcode(group),
                 )
             ok, problems = nf.check_fp_vs_content()
             if not ok:
-                header_failures.append((out_fp.name, problems))
+                header_failures.append((rel_path.as_posix(), problems))
 
         if total_size < min_total_size:
             message = (
@@ -168,12 +184,13 @@ def backup_nanopore(
             for name, digest in md5s:
                 md5_out.write("\t".join([name, digest]) + "\n")
 
-        for child in staging.iterdir():
-            child.chmod(READ_ONLY)
+        for path in staging.rglob("*"):
+            if path.is_file():
+                path.chmod(READ_ONLY)
 
         # All checks passed: publish the staged archive.
         write_dir.mkdir(parents=True, exist_ok=False)
-        for child in staging.iterdir():
+        for child in sorted(staging.iterdir()):
             shutil.move(str(child), str(write_dir / child.name))
     except BaseException:
         if write_dir.is_dir():

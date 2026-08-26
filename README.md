@@ -14,10 +14,12 @@ backup_illumina --forward-reads .../Undetermined_S0_L001_R1_001.fastq.gz \
 
 Nanopore (single-end; the reads are already demultiplexed by MinKNOW). Point it
 at the MinKNOW run folder (`<date>_<time>_<position>_<flowcell>_<runid>[...]`).
-Every `fastq_pass/<barcode>/` subdirectory's chunk files are concatenated into a
-single `<barcode>.fastq.gz` (a non-multiplexed run yields one `fastq_pass.fastq.gz`).
-The `final_summary_*.txt`, `report_*.html`, and the top-level `*.csv` / `*.json` /
-`*.tsv` / `*.md` run reports are copied into the archive alongside a `.md5` manifest.
+Each `fastq_pass/<barcode>/` subdirectory's chunk files are concatenated into a
+single `fastq_pass/<barcode>/<barcode>.fastq.gz` in the archive, preserving the
+per-barcode folder layout the ONT tools expect (a non-multiplexed run yields one
+`fastq_pass/<flowcell>.fastq.gz`). The `final_summary_*.txt`, `report_*.html`, and
+the top-level `*.csv` / `*.json` / `*.tsv` / `*.md` run reports are copied into the
+archive alongside a `.md5` manifest.
 
 ```
 backup_nanopore --run-dir .../20260401_1506_MN47822_FBE92725_8b1f29fd
