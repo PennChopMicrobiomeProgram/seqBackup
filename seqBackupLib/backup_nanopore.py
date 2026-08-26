@@ -103,19 +103,21 @@ def _archive_relpath(group: str | None, flowcell_id: str) -> Path:
 def backup_nanopore(
     run_dir: Path,
     dest_dir: Path,
-    sample_sheet: Path | None = None,
+    sample_sheet: Path,
     min_total_size: int = DEFAULT_MIN_TOTAL_SIZE,
     allow_check_failures: bool = False,
 ) -> Path:
     run_dir = Path(run_dir)
     dest_dir = Path(dest_dir)
-    sample_sheet = Path(sample_sheet) if sample_sheet is not None else None
+    sample_sheet = Path(sample_sheet)
 
     # Parsing the folder name determines the archive location, so this always
     # hard-fails regardless of --allow-check-failures.
     nd = NanoporeDir(run_dir.name)
 
-    if sample_sheet is not None and not sample_sheet.is_file():
+    # Required so the run's metadata is always recorded; a transfer run with no
+    # metadata is expected to point this at a dummy placeholder file.
+    if not sample_sheet.is_file():
         raise IOError("Sample sheet does not exist", str(sample_sheet))
 
     fastq_pass = run_dir / FASTQ_PASS_DIRNAME
@@ -184,10 +186,9 @@ def backup_nanopore(
                 if src.is_file():
                     shutil.copyfile(src, staging / src.name)
 
-        # Copied last so an explicitly supplied sheet wins over the run's own
+        # Copied last so the supplied sheet wins over the run's own
         # sample_sheet_*.csv if they happen to share a name.
-        if sample_sheet is not None:
-            shutil.copyfile(sample_sheet, staging / sample_sheet.name)
+        shutil.copyfile(sample_sheet, staging / sample_sheet.name)
 
         md5_out_fp = staging / ".".join([nd.build_archive_dir(), "md5"])
         with open(md5_out_fp, "w") as md5_out:
@@ -231,9 +232,8 @@ def main(argv=None):
     )
     parser.add_argument(
         "--sample-sheet",
-        required=False,
+        required=True,
         type=Path,
-        default=None,
         help="The sample sheet associated with the run.",
     )
     parser.add_argument(

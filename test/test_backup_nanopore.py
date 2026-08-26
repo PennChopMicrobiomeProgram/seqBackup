@@ -37,10 +37,12 @@ def test_find_fastq_groups_non_barcoded(non_barcoded_nanopore_dir):
     assert set(groups) == {None}
 
 
-def test_backup_nanopore_archives_reads_and_reports(tmp_path, minion_dir):
+def test_backup_nanopore_archives_reads_and_reports(
+    tmp_path, minion_dir, nanopore_sample_sheet
+):
     dest = tmp_path / "archive"
 
-    out_dir = backup_nanopore(minion_dir, dest, min_total_size=1)
+    out_dir = backup_nanopore(minion_dir, dest, nanopore_sample_sheet, min_total_size=1)
 
     assert out_dir == dest / minion_dir.name
     assert out_dir.is_dir()
@@ -60,6 +62,9 @@ def test_backup_nanopore_archives_reads_and_reports(tmp_path, minion_dir):
     assert (out_dir / "sample_sheet_FBE92725_x.csv").is_file()
     assert (out_dir / "throughput_FBE92725_x.csv").is_file()
     assert (out_dir / "barcode_alignment_FBE92725_x.tsv").is_file()
+
+    # the supplied (official) sample sheet is archived
+    assert (out_dir / nanopore_sample_sheet.name).is_file()
 
     # noise left behind
     assert not (out_dir / ".DS_Store").exists()
@@ -84,52 +89,53 @@ def test_backup_nanopore_archives_reads_and_reports(tmp_path, minion_dir):
     assert not (stat.S_IMODE(os.stat(bc01).st_mode) & stat.S_IWUSR)
 
 
-def test_backup_nanopore_non_barcoded(tmp_path, non_barcoded_nanopore_dir):
+def test_backup_nanopore_non_barcoded(
+    tmp_path, non_barcoded_nanopore_dir, nanopore_sample_sheet
+):
     dest = tmp_path / "archive"
-    out_dir = backup_nanopore(non_barcoded_nanopore_dir, dest, min_total_size=1)
+    out_dir = backup_nanopore(
+        non_barcoded_nanopore_dir, dest, nanopore_sample_sheet, min_total_size=1
+    )
     fq = out_dir / "fastq_pass" / "FBE92725.fastq.gz"
     assert fq.is_file()
     assert _count_records(fq) == 3
 
 
-def test_backup_nanopore_copies_supplied_sample_sheet(tmp_path, minion_dir):
-    dest = tmp_path / "archive"
-    sheet = tmp_path / "corrected_sample_sheet.csv"
-    sheet.write_text("barcode,sample_id\nbarcode01,S1\n")
-
-    out_dir = backup_nanopore(minion_dir, dest, sample_sheet=sheet, min_total_size=1)
-
-    copied = out_dir / "corrected_sample_sheet.csv"
-    assert copied.is_file()
-    assert copied.read_text() == sheet.read_text()
-    # the run's own sample_sheet_*.csv is still there too
-    assert (out_dir / "sample_sheet_FBE92725_x.csv").is_file()
-
-
-def test_backup_nanopore_missing_supplied_sample_sheet(tmp_path, minion_dir):
+def test_backup_nanopore_missing_sample_sheet(tmp_path, minion_dir):
     with pytest.raises(IOError, match="Sample sheet does not exist"):
         backup_nanopore(
             minion_dir,
             tmp_path / "archive",
-            sample_sheet=tmp_path / "nope.csv",
+            tmp_path / "nope.csv",
             min_total_size=1,
         )
     # bailed out before creating anything
     assert not (tmp_path / "archive").exists()
 
 
-def test_backup_nanopore_refuses_existing_archive(tmp_path, minion_dir):
+def test_backup_nanopore_dummy_sample_sheet_ok(tmp_path, minion_dir):
+    # transfer runs with no metadata use a placeholder file
+    dummy = tmp_path / "dummy.tsv"
+    dummy.write_text("no metadata; transfer run\n")
+
+    out_dir = backup_nanopore(minion_dir, tmp_path / "archive", dummy, min_total_size=1)
+    assert (out_dir / "dummy.tsv").is_file()
+
+
+def test_backup_nanopore_refuses_existing_archive(
+    tmp_path, minion_dir, nanopore_sample_sheet
+):
     dest = tmp_path / "archive"
-    backup_nanopore(minion_dir, dest, min_total_size=1)
+    backup_nanopore(minion_dir, dest, nanopore_sample_sheet, min_total_size=1)
     with pytest.raises(FileExistsError):
-        backup_nanopore(minion_dir, dest, min_total_size=1)
+        backup_nanopore(minion_dir, dest, nanopore_sample_sheet, min_total_size=1)
 
 
-def test_backup_nanopore_size_check(tmp_path, minion_dir):
+def test_backup_nanopore_size_check(tmp_path, minion_dir, nanopore_sample_sheet):
     dest = tmp_path / "archive"
 
     with pytest.raises(ValueError, match="below the minimum"):
-        backup_nanopore(minion_dir, dest, min_total_size=10**12)
+        backup_nanopore(minion_dir, dest, nanopore_sample_sheet, min_total_size=10**12)
 
     # nothing left behind after the failure
     assert not (dest / minion_dir.name).exists()
@@ -137,12 +143,16 @@ def test_backup_nanopore_size_check(tmp_path, minion_dir):
 
     with pytest.warns(UserWarning, match="below the minimum"):
         out_dir = backup_nanopore(
-            minion_dir, dest, min_total_size=10**12, allow_check_failures=True
+            minion_dir,
+            dest,
+            nanopore_sample_sheet,
+            min_total_size=10**12,
+            allow_check_failures=True,
         )
     assert out_dir.is_dir()
 
 
-def test_backup_nanopore_header_mismatch(tmp_path, minion_dir):
+def test_backup_nanopore_header_mismatch(tmp_path, minion_dir, nanopore_sample_sheet):
     # rewrite barcode01 chunks with the wrong flow cell id
     bc = minion_dir / "fastq_pass" / "barcode01"
     for chunk in bc.glob("*.fastq.gz"):
@@ -151,22 +161,30 @@ def test_backup_nanopore_header_mismatch(tmp_path, minion_dir):
 
     dest = tmp_path / "archive"
     with pytest.raises(ValueError, match="header info does not match"):
-        backup_nanopore(minion_dir, dest, min_total_size=1)
+        backup_nanopore(minion_dir, dest, nanopore_sample_sheet, min_total_size=1)
 
     with pytest.warns(UserWarning, match="header info does not match"):
-        backup_nanopore(minion_dir, dest, min_total_size=1, allow_check_failures=True)
+        backup_nanopore(
+            minion_dir,
+            dest,
+            nanopore_sample_sheet,
+            min_total_size=1,
+            allow_check_failures=True,
+        )
 
 
-def test_backup_nanopore_missing_fastq_pass(tmp_path, minion_dir):
+def test_backup_nanopore_missing_fastq_pass(
+    tmp_path, minion_dir, nanopore_sample_sheet
+):
     shutil.rmtree(minion_dir / "fastq_pass")
     with pytest.raises(IOError):
-        backup_nanopore(minion_dir, tmp_path / "archive", min_total_size=1)
+        backup_nanopore(
+            minion_dir, tmp_path / "archive", nanopore_sample_sheet, min_total_size=1
+        )
 
 
-def test_main_returns_archive_path(tmp_path, p2i_dir):
+def test_main_returns_archive_path(tmp_path, p2i_dir, nanopore_sample_sheet):
     dest = tmp_path / "archive"
-    sheet = tmp_path / "run_sheet.csv"
-    sheet.write_text("barcode,sample_id\n")
     out_dir = main(
         [
             "--run-dir",
@@ -174,7 +192,7 @@ def test_main_returns_archive_path(tmp_path, p2i_dir):
             "--destination-dir",
             str(dest),
             "--sample-sheet",
-            str(sheet),
+            str(nanopore_sample_sheet),
             "--min-total-size",
             "1",
         ]
@@ -182,7 +200,12 @@ def test_main_returns_archive_path(tmp_path, p2i_dir):
     assert out_dir == dest / p2i_dir.name
     assert out_dir.is_dir()
     assert (out_dir / "fastq_pass" / "barcode01" / "barcode01.fastq.gz").is_file()
-    assert (out_dir / "run_sheet.csv").is_file()
+    assert (out_dir / nanopore_sample_sheet.name).is_file()
+
+
+def test_sample_sheet_is_required(tmp_path, minion_dir):
+    with pytest.raises(SystemExit):
+        main(["--run-dir", str(minion_dir), "--destination-dir", str(tmp_path)])
 
 
 def test_destination_dir_defaults_to_raw_data(monkeypatch, tmp_path, minion_dir):
@@ -195,5 +218,5 @@ def test_destination_dir_defaults_to_raw_data(monkeypatch, tmp_path, minion_dir)
         return tmp_path
 
     monkeypatch.setattr(bn, "backup_nanopore", fake_backup)
-    main(["--run-dir", str(minion_dir)])
+    main(["--run-dir", str(minion_dir), "--sample-sheet", str(tmp_path / "s.csv")])
     assert seen["dest"] == DEFAULT_DESTINATION_DIR

@@ -113,6 +113,13 @@ def non_barcoded_nanopore_dir(tmp_path) -> Path:
     )
 
 
+@pytest.fixture
+def nanopore_sample_sheet(tmp_path) -> Path:
+    fp = tmp_path / "CHOPMC-611_NimaGen_04012026.tsv"
+    fp.write_text("barcode\tsample_id\nbarcode01\tS1\nbarcode02\tS2\n")
+    return fp
+
+
 def setup_illumina_dir(fp: Path, r1: str, r1_lines: list[str]) -> Path:
     fp.mkdir(parents=True, exist_ok=True)
 
