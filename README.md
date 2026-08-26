@@ -25,7 +25,9 @@ archive alongside a `.md5` manifest.
 backup_nanopore --run-dir .../20260401_1506_MN47822_FBE92725_8b1f29fd
 ```
 
-`--destination-dir` defaults to `/mnt/isilon/microbiome/raw_data`.
+`--destination-dir` defaults to `/mnt/isilon/microbiome/raw_data`. The run's own
+`sample_sheet_*.csv` is archived automatically; pass `--sample-sheet` as well to
+copy in an external/corrected sheet.
 
 Both commands take `--allow-check-failures` to archive despite failed validation
 checks (a warning is emitted instead of an error).

@@ -92,6 +92,32 @@ def test_backup_nanopore_non_barcoded(tmp_path, non_barcoded_nanopore_dir):
     assert _count_records(fq) == 3
 
 
+def test_backup_nanopore_copies_supplied_sample_sheet(tmp_path, minion_dir):
+    dest = tmp_path / "archive"
+    sheet = tmp_path / "corrected_sample_sheet.csv"
+    sheet.write_text("barcode,sample_id\nbarcode01,S1\n")
+
+    out_dir = backup_nanopore(minion_dir, dest, sample_sheet=sheet, min_total_size=1)
+
+    copied = out_dir / "corrected_sample_sheet.csv"
+    assert copied.is_file()
+    assert copied.read_text() == sheet.read_text()
+    # the run's own sample_sheet_*.csv is still there too
+    assert (out_dir / "sample_sheet_FBE92725_x.csv").is_file()
+
+
+def test_backup_nanopore_missing_supplied_sample_sheet(tmp_path, minion_dir):
+    with pytest.raises(IOError, match="Sample sheet does not exist"):
+        backup_nanopore(
+            minion_dir,
+            tmp_path / "archive",
+            sample_sheet=tmp_path / "nope.csv",
+            min_total_size=1,
+        )
+    # bailed out before creating anything
+    assert not (tmp_path / "archive").exists()
+
+
 def test_backup_nanopore_refuses_existing_archive(tmp_path, minion_dir):
     dest = tmp_path / "archive"
     backup_nanopore(minion_dir, dest, min_total_size=1)
@@ -139,12 +165,16 @@ def test_backup_nanopore_missing_fastq_pass(tmp_path, minion_dir):
 
 def test_main_returns_archive_path(tmp_path, p2i_dir):
     dest = tmp_path / "archive"
+    sheet = tmp_path / "run_sheet.csv"
+    sheet.write_text("barcode,sample_id\n")
     out_dir = main(
         [
             "--run-dir",
             str(p2i_dir),
             "--destination-dir",
             str(dest),
+            "--sample-sheet",
+            str(sheet),
             "--min-total-size",
             "1",
         ]
@@ -152,6 +182,7 @@ def test_main_returns_archive_path(tmp_path, p2i_dir):
     assert out_dir == dest / p2i_dir.name
     assert out_dir.is_dir()
     assert (out_dir / "fastq_pass" / "barcode01" / "barcode01.fastq.gz").is_file()
+    assert (out_dir / "run_sheet.csv").is_file()
 
 
 def test_destination_dir_defaults_to_raw_data(monkeypatch, tmp_path, minion_dir):
