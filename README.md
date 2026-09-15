@@ -12,14 +12,17 @@ backup_illumina --forward-reads .../Undetermined_S0_L001_R1_001.fastq.gz \
   --destination-dir /path/to/archive --sample-sheet .../sample_sheet.csv
 ```
 
-Nanopore (single-end; the reads are already demultiplexed by MinKNOW). Point it
-at the MinKNOW run folder (`<date>_<time>_<position>_<flowcell>_<runid>[...]`).
-Each `fastq_pass/<barcode>/` subdirectory's chunk files are concatenated into a
-single `fastq_pass/<barcode>/<barcode>.fastq.gz` in the archive, preserving the
-per-barcode folder layout the ONT tools expect (a non-multiplexed run yields one
-`fastq_pass/<flowcell>.fastq.gz`). The `final_summary_*.txt`, `report_*.html`, and
-the top-level `*.csv` / `*.json` / `*.tsv` / `*.md` run reports are copied into the
-archive alongside a `.md5` manifest.
+Nanopore (single-end, already basecalled by MinKNOW). Point it at the MinKNOW
+run folder (`<date>_<time>_<position>_<flowcell>_<runid>[...]`). Every
+`.fastq.gz` chunk under `fastq_pass/` (across all barcode subdirectories, if
+any) is concatenated into one `<flowcell>.fastq.gz` in the archive -- the same
+convention as Illumina, which archives the undemultiplexed `Undetermined`
+reads and splits later. Demultiplexing is not lost: each pass read's fastq
+header still carries `barcode=barcodeNN`/`barcode_alias=`, which is enough to
+split back out with a header-based script; re-demultiplexing from raw sequence
+(e.g. to change stringency) needs `dorado demux`. The `final_summary_*.txt`,
+`report_*.html`, and the top-level `*.csv` / `*.json` / `*.tsv` / `*.md` run
+reports are copied into the archive alongside a `.md5` manifest.
 
 ```
 backup_nanopore --run-dir .../20260401_1506_MN47822_FBE92725_8b1f29fd \
@@ -28,7 +31,8 @@ backup_nanopore --run-dir .../20260401_1506_MN47822_FBE92725_8b1f29fd \
 
 `--sample-sheet` is required so the run's metadata is always recorded (for a
 transfer run with no metadata, point it at a dummy placeholder file).
-`--destination-dir` defaults to `/mnt/isilon/microbiome/raw_data`.
+`--destination-dir` defaults to `/mnt/isilon/microbiome/raw_data`. `--min-file-size`
+(default 500MB) is the minimum size of the concatenated fastq.
 
 Both commands take `--allow-check-failures` to archive despite failed validation
 checks (a warning is emitted instead of an error).

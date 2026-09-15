@@ -13,7 +13,7 @@ from seqBackupLib.nanopore import NanoporeDir, NanoporeFastq, natural_sort_key
 
 # A real ONT run is always well over this; the check exists to catch a run that
 # was pointed at the wrong folder or copied while still in progress.
-DEFAULT_MIN_TOTAL_SIZE = 500000000  # 500MB
+DEFAULT_MIN_FILE_SIZE = 500000000  # 500MB
 
 FASTQ_PASS_DIRNAME = "fastq_pass"
 
@@ -44,26 +44,20 @@ def return_md5(fp: Path) -> str:
     return hash_md5.hexdigest()
 
 
-def find_fastq_groups(fastq_pass_dir: Path) -> dict[str | None, list[Path]]:
-    """Map a barcode subdirectory name to its ordered list of fastq.gz chunks.
+def find_fastq_chunks(fastq_pass_dir: Path) -> list[Path]:
+    """All fastq.gz chunks under fastq_pass/, in a stable concatenation order.
 
-    A multiplexed run has ``fastq_pass/barcode01/``, ``fastq_pass/unclassified/``
-    etc., each holding many chunk files -> keyed by the subdirectory name.  A
-    non-multiplexed run drops the chunks straight into ``fastq_pass/`` -> keyed
-    by ``None``.
+    A multiplexed run keeps its chunks under ``fastq_pass/<barcode>/``; a
+    non-multiplexed run drops them straight into ``fastq_pass/``. Either way,
+    every chunk is merged into one archived file (matching the Illumina
+    convention of archiving the undemultiplexed reads and splitting later), so
+    sorting is by (containing folder, natural chunk order) purely to make the
+    result reproducible and easy to reason about -- not to group output files.
     """
-    groups: dict[str | None, list[Path]] = {}
-
-    for subdir in sorted(d for d in fastq_pass_dir.iterdir() if d.is_dir()):
-        chunks = sorted(subdir.glob("*.fastq.gz"), key=natural_sort_key)
-        if chunks:
-            groups[subdir.name] = chunks
-
-    top_level = sorted(fastq_pass_dir.glob("*.fastq.gz"), key=natural_sort_key)
-    if top_level:
-        groups.setdefault(None, top_level)
-
-    return groups
+    return sorted(
+        fastq_pass_dir.rglob("*.fastq.gz"),
+        key=lambda p: (p.parent.name, natural_sort_key(p)),
+    )
 
 
 def concatenate_gzips(chunks: list[Path], dest: Path) -> str:
@@ -82,29 +76,11 @@ def concatenate_gzips(chunks: list[Path], dest: Path) -> str:
     return hash_md5.hexdigest()
 
 
-def _expected_barcode(group: str | None) -> str | None:
-    if group is not None and (group == "unclassified" or group.startswith("barcode")):
-        return group
-    return None
-
-
-def _archive_relpath(group: str | None, flowcell_id: str) -> Path:
-    """Where a group's concatenated fastq lands inside the archive.
-
-    Barcode subdirectories are preserved (the ONT tools expect
-    ``fastq_pass/<barcode>/*.fastq.gz``); an un-subdivided run gets one file
-    directly under ``fastq_pass/``.
-    """
-    if group is None:
-        return Path(FASTQ_PASS_DIRNAME) / f"{flowcell_id}.fastq.gz"
-    return Path(FASTQ_PASS_DIRNAME) / group / f"{group}.fastq.gz"
-
-
 def backup_nanopore(
     run_dir: Path,
     dest_dir: Path,
     sample_sheet: Path,
-    min_total_size: int = DEFAULT_MIN_TOTAL_SIZE,
+    min_file_size: int = DEFAULT_MIN_FILE_SIZE,
     allow_check_failures: bool = False,
 ) -> Path:
     run_dir = Path(run_dir)
@@ -124,8 +100,8 @@ def backup_nanopore(
     if not fastq_pass.is_dir():
         raise IOError("fastq_pass directory not found", str(fastq_pass))
 
-    groups = find_fastq_groups(fastq_pass)
-    if not groups:
+    chunks = find_fastq_chunks(fastq_pass)
+    if not chunks:
         raise IOError("No .fastq.gz files found under fastq_pass", str(fastq_pass))
 
     write_dir = dest_dir / nd.build_archive_dir()
@@ -137,45 +113,28 @@ def backup_nanopore(
         tempfile.mkdtemp(dir=dest_dir, prefix=f".{nd.build_archive_dir()}.staging.")
     )
     try:
-        md5s: list[tuple[str, str]] = []
-        header_failures: list[tuple[str, dict]] = []
-        total_size = 0
-
         flowcell_id = nd.folder_info["flowcell_id"]
-        for group, chunks in groups.items():
-            rel_path = _archive_relpath(group, flowcell_id)
-            out_fp = staging / rel_path
-            out_fp.parent.mkdir(parents=True, exist_ok=True)
+        out_fp = staging / f"{flowcell_id}.fastq.gz"
 
-            digest = concatenate_gzips(chunks, out_fp)
-            total_size += out_fp.stat().st_size
-            md5s.append((rel_path.as_posix(), digest))
+        digest = concatenate_gzips(chunks, out_fp)
+        file_size = out_fp.stat().st_size
 
-            with gzip.open(out_fp, "rt") as handle:
-                nf = NanoporeFastq(
-                    handle,
-                    expected_flowcell=flowcell_id,
-                    expected_barcode=_expected_barcode(group),
-                )
-            ok, problems = nf.check_fp_vs_content()
-            if not ok:
-                header_failures.append((rel_path.as_posix(), problems))
+        with gzip.open(out_fp, "rt") as handle:
+            nf = NanoporeFastq(handle, expected_flowcell=flowcell_id)
+        ok, problems = nf.check_fp_vs_content()
 
-        if total_size < min_total_size:
+        if file_size < min_file_size:
             message = (
-                f"Concatenated fastq files total {total_size} bytes, below the minimum "
-                f"of {min_total_size}. Check the run folder or lower --min-total-size."
+                f"Concatenated fastq is {file_size} bytes, below the minimum of "
+                f"{min_file_size}. Check the run folder or lower --min-file-size."
             )
             if allow_check_failures:
                 warnings.warn(message)
             else:
                 raise ValueError(message)
 
-        if header_failures:
-            message = (
-                "FASTQ header info does not match the run folder",
-                header_failures,
-            )
+        if not ok:
+            message = ("FASTQ header info does not match the run folder", problems)
             if allow_check_failures:
                 warnings.warn(f"{message[0]}: {message[1]}")
             else:
@@ -192,10 +151,9 @@ def backup_nanopore(
 
         md5_out_fp = staging / ".".join([nd.build_archive_dir(), "md5"])
         with open(md5_out_fp, "w") as md5_out:
-            for name, digest in md5s:
-                md5_out.write("\t".join([name, digest]) + "\n")
+            md5_out.write("\t".join([out_fp.name, digest]) + "\n")
 
-        for path in staging.rglob("*"):
+        for path in staging.iterdir():
             if path.is_file():
                 path.chmod(READ_ONLY)
 
@@ -237,11 +195,11 @@ def main(argv=None):
         help="The sample sheet associated with the run.",
     )
     parser.add_argument(
-        "--min-total-size",
+        "--min-file-size",
         required=False,
         type=int,
-        default=DEFAULT_MIN_TOTAL_SIZE,
-        help="Minimum combined size (bytes) of all concatenated fastq files.",
+        default=DEFAULT_MIN_FILE_SIZE,
+        help="Minimum size (bytes) of the concatenated fastq file.",
     )
     parser.add_argument(
         "--allow-check-failures",
@@ -253,6 +211,6 @@ def main(argv=None):
         args.run_dir,
         args.destination_dir,
         args.sample_sheet,
-        args.min_total_size,
+        args.min_file_size,
         args.allow_check_failures,
     )

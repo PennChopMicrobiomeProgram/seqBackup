@@ -10,7 +10,7 @@ import seqBackupLib.backup_nanopore as bn
 from seqBackupLib.backup_nanopore import (
     DEFAULT_DESTINATION_DIR,
     backup_nanopore,
-    find_fastq_groups,
+    find_fastq_chunks,
     main,
     return_md5,
 )
@@ -21,20 +21,26 @@ def _count_records(fp) -> int:
         return sum(1 for _ in handle) // 4
 
 
-def test_find_fastq_groups_barcoded(minion_dir):
-    groups = find_fastq_groups(minion_dir / "fastq_pass")
-    assert set(groups) == {"barcode01", "barcode02", "unclassified"}
-    # chunks come back in natural (numeric) order, not lexical (_10 before _5)
-    assert [p.name for p in groups["barcode01"]] == [
+def test_find_fastq_chunks_barcoded(minion_dir):
+    chunks = find_fastq_chunks(minion_dir / "fastq_pass")
+    # every chunk across every barcode folder, grouped by folder then natural
+    # (numeric) chunk order -- not lexical (_10 before _5)
+    assert [p.name for p in chunks] == [
         "FBE92725_pass_barcode01_8b1f29fd_117e08fc_0.fastq.gz",
         "FBE92725_pass_barcode01_8b1f29fd_117e08fc_5.fastq.gz",
         "FBE92725_pass_barcode01_8b1f29fd_117e08fc_10.fastq.gz",
+        "FBE92725_pass_barcode02_8b1f29fd_117e08fc_0.fastq.gz",
+        "FBE92725_pass_barcode02_8b1f29fd_117e08fc_5.fastq.gz",
+        "FBE92725_pass_barcode02_8b1f29fd_117e08fc_10.fastq.gz",
+        "FBE92725_pass_unclassified_8b1f29fd_117e08fc_0.fastq.gz",
+        "FBE92725_pass_unclassified_8b1f29fd_117e08fc_5.fastq.gz",
+        "FBE92725_pass_unclassified_8b1f29fd_117e08fc_10.fastq.gz",
     ]
 
 
-def test_find_fastq_groups_non_barcoded(non_barcoded_nanopore_dir):
-    groups = find_fastq_groups(non_barcoded_nanopore_dir / "fastq_pass")
-    assert set(groups) == {None}
+def test_find_fastq_chunks_non_barcoded(non_barcoded_nanopore_dir):
+    chunks = find_fastq_chunks(non_barcoded_nanopore_dir / "fastq_pass")
+    assert len(chunks) == 3
 
 
 def test_backup_nanopore_archives_reads_and_reports(
@@ -42,17 +48,16 @@ def test_backup_nanopore_archives_reads_and_reports(
 ):
     dest = tmp_path / "archive"
 
-    out_dir = backup_nanopore(minion_dir, dest, nanopore_sample_sheet, min_total_size=1)
+    out_dir = backup_nanopore(minion_dir, dest, nanopore_sample_sheet, min_file_size=1)
 
     assert out_dir == dest / minion_dir.name
     assert out_dir.is_dir()
 
-    # the fastq_pass/<barcode>/ layout is preserved, one concatenated file per
-    # barcode folder (each holding all 3 single-read chunks)
-    for barcode in ("barcode01", "barcode02", "unclassified"):
-        fq = out_dir / "fastq_pass" / barcode / f"{barcode}.fastq.gz"
-        assert fq.is_file()
-        assert _count_records(fq) == 3
+    # every chunk from every barcode folder is merged into one file, matching
+    # how Illumina archives the undemultiplexed reads
+    fq = out_dir / "FBE92725.fastq.gz"
+    assert fq.is_file()
+    assert _count_records(fq) == 9  # 3 barcode dirs x 3 single-read chunks
 
     # reports kept
     assert (out_dir / "final_summary_FBE92725_x.txt").is_file()
@@ -71,22 +76,15 @@ def test_backup_nanopore_archives_reads_and_reports(
     assert not (out_dir / ".Rhistory").exists()
     assert not (out_dir / "sequencing_summary_FBE92725_x.txt").exists()
 
-    # md5 manifest covers every concatenated fastq, keyed by archive-relative path
+    # md5 manifest covers the concatenated fastq
     md5_fp = out_dir / f"{minion_dir.name}.md5"
     assert md5_fp.is_file()
     entries = dict(line.split("\t") for line in md5_fp.read_text().splitlines() if line)
-    assert set(entries) == {
-        "fastq_pass/barcode01/barcode01.fastq.gz",
-        "fastq_pass/barcode02/barcode02.fastq.gz",
-        "fastq_pass/unclassified/unclassified.fastq.gz",
-    }
-    bc01 = out_dir / "fastq_pass" / "barcode01" / "barcode01.fastq.gz"
-    assert entries["fastq_pass/barcode01/barcode01.fastq.gz"].strip() == return_md5(
-        bc01
-    )
+    assert set(entries) == {"FBE92725.fastq.gz"}
+    assert entries["FBE92725.fastq.gz"].strip() == return_md5(fq)
 
-    # archived fastqs are read-only
-    assert not (stat.S_IMODE(os.stat(bc01).st_mode) & stat.S_IWUSR)
+    # archived fastq is read-only
+    assert not (stat.S_IMODE(os.stat(fq).st_mode) & stat.S_IWUSR)
 
 
 def test_backup_nanopore_non_barcoded(
@@ -94,9 +92,9 @@ def test_backup_nanopore_non_barcoded(
 ):
     dest = tmp_path / "archive"
     out_dir = backup_nanopore(
-        non_barcoded_nanopore_dir, dest, nanopore_sample_sheet, min_total_size=1
+        non_barcoded_nanopore_dir, dest, nanopore_sample_sheet, min_file_size=1
     )
-    fq = out_dir / "fastq_pass" / "FBE92725.fastq.gz"
+    fq = out_dir / "FBE92725.fastq.gz"
     assert fq.is_file()
     assert _count_records(fq) == 3
 
@@ -107,7 +105,7 @@ def test_backup_nanopore_missing_sample_sheet(tmp_path, minion_dir):
             minion_dir,
             tmp_path / "archive",
             tmp_path / "nope.csv",
-            min_total_size=1,
+            min_file_size=1,
         )
     # bailed out before creating anything
     assert not (tmp_path / "archive").exists()
@@ -118,7 +116,7 @@ def test_backup_nanopore_dummy_sample_sheet_ok(tmp_path, minion_dir):
     dummy = tmp_path / "dummy.tsv"
     dummy.write_text("no metadata; transfer run\n")
 
-    out_dir = backup_nanopore(minion_dir, tmp_path / "archive", dummy, min_total_size=1)
+    out_dir = backup_nanopore(minion_dir, tmp_path / "archive", dummy, min_file_size=1)
     assert (out_dir / "dummy.tsv").is_file()
 
 
@@ -126,16 +124,16 @@ def test_backup_nanopore_refuses_existing_archive(
     tmp_path, minion_dir, nanopore_sample_sheet
 ):
     dest = tmp_path / "archive"
-    backup_nanopore(minion_dir, dest, nanopore_sample_sheet, min_total_size=1)
+    backup_nanopore(minion_dir, dest, nanopore_sample_sheet, min_file_size=1)
     with pytest.raises(FileExistsError):
-        backup_nanopore(minion_dir, dest, nanopore_sample_sheet, min_total_size=1)
+        backup_nanopore(minion_dir, dest, nanopore_sample_sheet, min_file_size=1)
 
 
 def test_backup_nanopore_size_check(tmp_path, minion_dir, nanopore_sample_sheet):
     dest = tmp_path / "archive"
 
     with pytest.raises(ValueError, match="below the minimum"):
-        backup_nanopore(minion_dir, dest, nanopore_sample_sheet, min_total_size=10**12)
+        backup_nanopore(minion_dir, dest, nanopore_sample_sheet, min_file_size=10**12)
 
     # nothing left behind after the failure
     assert not (dest / minion_dir.name).exists()
@@ -146,29 +144,30 @@ def test_backup_nanopore_size_check(tmp_path, minion_dir, nanopore_sample_sheet)
             minion_dir,
             dest,
             nanopore_sample_sheet,
-            min_total_size=10**12,
+            min_file_size=10**12,
             allow_check_failures=True,
         )
     assert out_dir.is_dir()
 
 
 def test_backup_nanopore_header_mismatch(tmp_path, minion_dir, nanopore_sample_sheet):
-    # rewrite barcode01 chunks with the wrong flow cell id
+    # barcode01 sorts first, so corrupting it corrupts the merged file's first
+    # (representative) header
     bc = minion_dir / "fastq_pass" / "barcode01"
     for chunk in bc.glob("*.fastq.gz"):
         with gzip.open(chunk, "wt") as handle:
-            handle.write("@readx flow_cell_id=WRONG barcode=barcode01\nACGT\n+\nIIII\n")
+            handle.write("@readx flow_cell_id=WRONG\nACGT\n+\nIIII\n")
 
     dest = tmp_path / "archive"
     with pytest.raises(ValueError, match="header info does not match"):
-        backup_nanopore(minion_dir, dest, nanopore_sample_sheet, min_total_size=1)
+        backup_nanopore(minion_dir, dest, nanopore_sample_sheet, min_file_size=1)
 
     with pytest.warns(UserWarning, match="header info does not match"):
         backup_nanopore(
             minion_dir,
             dest,
             nanopore_sample_sheet,
-            min_total_size=1,
+            min_file_size=1,
             allow_check_failures=True,
         )
 
@@ -179,7 +178,7 @@ def test_backup_nanopore_missing_fastq_pass(
     shutil.rmtree(minion_dir / "fastq_pass")
     with pytest.raises(IOError):
         backup_nanopore(
-            minion_dir, tmp_path / "archive", nanopore_sample_sheet, min_total_size=1
+            minion_dir, tmp_path / "archive", nanopore_sample_sheet, min_file_size=1
         )
 
 
@@ -193,13 +192,13 @@ def test_main_returns_archive_path(tmp_path, p2i_dir, nanopore_sample_sheet):
             str(dest),
             "--sample-sheet",
             str(nanopore_sample_sheet),
-            "--min-total-size",
+            "--min-file-size",
             "1",
         ]
     )
     assert out_dir == dest / p2i_dir.name
     assert out_dir.is_dir()
-    assert (out_dir / "fastq_pass" / "barcode01" / "barcode01.fastq.gz").is_file()
+    assert (out_dir / "PBK70557.fastq.gz").is_file()
     assert (out_dir / nanopore_sample_sheet.name).is_file()
 
 
