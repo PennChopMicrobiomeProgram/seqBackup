@@ -207,17 +207,26 @@ def main(argv=None):
         help="Continue archiving even if validation checks fail",
     )
     args = parser.parse_args(argv)
-    write_dir = backup_nanopore(
+    return backup_nanopore(
         args.run_dir,
         args.destination_dir,
         args.sample_sheet,
         args.min_file_size,
         args.allow_check_failures,
     )
-    # Print the archive location rather than returning it: the installed
-    # console-script wrapper does sys.exit(main()), and sys.exit() treats any
-    # non-None, non-int argument as an error -- printing it to stderr and
-    # exiting 1 -- so returning the Path here made every successful run look
-    # like a failure.
+
+
+def cli(argv=None):
+    """Console-script entry point (see pyproject.toml's [project.scripts]).
+
+    main() returns the archive Path -- library callers (e.g. auto_bfx's
+    archive task) depend on that. But the installed console-script wraps its
+    entry point as sys.exit(entry_point()), and sys.exit() treats any
+    non-None, non-int argument as an error: it gets printed to stderr and the
+    process exits 1. Routing main()'s Path return straight through sys.exit()
+    made every successful `backup_nanopore` invocation report as a failure.
+    This wrapper prints the path instead and returns a real exit code.
+    """
+    write_dir = main(argv)
     print(write_dir)
     return 0

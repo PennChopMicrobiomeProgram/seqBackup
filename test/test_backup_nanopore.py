@@ -10,6 +10,7 @@ import seqBackupLib.backup_nanopore as bn
 from seqBackupLib.backup_nanopore import (
     DEFAULT_DESTINATION_DIR,
     backup_nanopore,
+    cli,
     find_fastq_chunks,
     main,
     return_md5,
@@ -182,16 +183,43 @@ def test_backup_nanopore_missing_fastq_pass(
         )
 
 
-def test_main_prints_archive_path_and_returns_zero(
+def test_main_returns_archive_path(tmp_path, p2i_dir, nanopore_sample_sheet):
+    # main() is also called directly as a library function (e.g. by
+    # auto_bfx's archive task), which depends on getting the archive Path
+    # back -- so main() itself must keep returning it. See test_cli_* below
+    # for the console-script entry point, which wraps main() instead of
+    # replacing it.
+    dest = tmp_path / "archive"
+    out_dir = main(
+        [
+            "--run-dir",
+            str(p2i_dir),
+            "--destination-dir",
+            str(dest),
+            "--sample-sheet",
+            str(nanopore_sample_sheet),
+            "--min-file-size",
+            "1",
+        ]
+    )
+    assert out_dir == dest / p2i_dir.name
+    assert out_dir.is_dir()
+    assert (out_dir / "PBK70557.fastq.gz").is_file()
+    assert (out_dir / nanopore_sample_sheet.name).is_file()
+
+
+def test_cli_prints_archive_path_and_returns_zero(
     capsys, tmp_path, p2i_dir, nanopore_sample_sheet
 ):
+    # cli() is what [project.scripts] points backup_nanopore at. The
+    # installed console-script wraps it as sys.exit(cli()), and sys.exit()
+    # treats any non-None, non-int argument as an error -- printed to
+    # stderr, exit code 1 -- so cli() must return 0/None rather than the
+    # Path main() returns, or every successful run would report as a
+    # failure.
     dest = tmp_path / "archive"
     out_dir = dest / p2i_dir.name
-    # main() must return 0 (or None), not the archive Path: the installed
-    # console-script wrapper does sys.exit(main()), and sys.exit() treats any
-    # non-None, non-int argument as an error, printing it to stderr and
-    # exiting 1 -- which made every successful run look like a failure.
-    result = main(
+    result = cli(
         [
             "--run-dir",
             str(p2i_dir),
