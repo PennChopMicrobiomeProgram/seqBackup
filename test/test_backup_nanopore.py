@@ -182,9 +182,16 @@ def test_backup_nanopore_missing_fastq_pass(
         )
 
 
-def test_main_returns_archive_path(tmp_path, p2i_dir, nanopore_sample_sheet):
+def test_main_prints_archive_path_and_returns_zero(
+    capsys, tmp_path, p2i_dir, nanopore_sample_sheet
+):
     dest = tmp_path / "archive"
-    out_dir = main(
+    out_dir = dest / p2i_dir.name
+    # main() must return 0 (or None), not the archive Path: the installed
+    # console-script wrapper does sys.exit(main()), and sys.exit() treats any
+    # non-None, non-int argument as an error, printing it to stderr and
+    # exiting 1 -- which made every successful run look like a failure.
+    result = main(
         [
             "--run-dir",
             str(p2i_dir),
@@ -196,7 +203,8 @@ def test_main_returns_archive_path(tmp_path, p2i_dir, nanopore_sample_sheet):
             "1",
         ]
     )
-    assert out_dir == dest / p2i_dir.name
+    assert result == 0
+    assert capsys.readouterr().out.strip() == str(out_dir)
     assert out_dir.is_dir()
     assert (out_dir / "PBK70557.fastq.gz").is_file()
     assert (out_dir / nanopore_sample_sheet.name).is_file()

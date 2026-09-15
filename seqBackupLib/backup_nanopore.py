@@ -207,10 +207,17 @@ def main(argv=None):
         help="Continue archiving even if validation checks fail",
     )
     args = parser.parse_args(argv)
-    return backup_nanopore(
+    write_dir = backup_nanopore(
         args.run_dir,
         args.destination_dir,
         args.sample_sheet,
         args.min_file_size,
         args.allow_check_failures,
     )
+    # Print the archive location rather than returning it: the installed
+    # console-script wrapper does sys.exit(main()), and sys.exit() treats any
+    # non-None, non-int argument as an error -- printing it to stderr and
+    # exiting 1 -- so returning the Path here made every successful run look
+    # like a failure.
+    print(write_dir)
+    return 0
