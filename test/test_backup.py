@@ -1,7 +1,13 @@
 import pytest
 from pathlib import Path
 import gzip
-from seqBackupLib.backup import backup_fastq, build_fp_to_archive, return_md5, main
+from seqBackupLib.backup import (
+    backup_fastq,
+    build_fp_to_archive,
+    cli,
+    main,
+    return_md5,
+)
 
 
 def _write_fastq(fp: Path, header: str) -> None:
@@ -115,6 +121,11 @@ def test_backup_fastq_without_lane(tmp_path, full_miseq_dir):
 
 
 def test_main_returns_archive_path(tmp_path, full_miseq_dir):
+    # main() is also called directly as a library function -- auto_bfx's
+    # archive task calls seqBackupLib.backup.main(args) and returns the
+    # result as the archive location -- so main() itself must keep
+    # returning the Path. See test_cli_* below for the console-script entry
+    # point, which wraps main() instead of replacing it.
     raw = tmp_path / "raw_reads"
     raw.mkdir(parents=True, exist_ok=True)
     sample_sheet_fp = full_miseq_dir / "sample_sheet.csv"
@@ -134,6 +145,36 @@ def test_main_returns_archive_path(tmp_path, full_miseq_dir):
 
     expected_dir = raw / "250407_M03543_0443_000000000-DTHBL_L001"
     assert out_dir == expected_dir
+    assert expected_dir.is_dir()
+
+
+def test_cli_prints_archive_path_and_returns_zero(capsys, tmp_path, full_miseq_dir):
+    # cli() is what [project.scripts] points backup_illumina at. The
+    # installed console-script wraps it as sys.exit(cli()), and sys.exit()
+    # treats any non-None, non-int argument as an error -- printed to
+    # stderr, exit code 1 -- so cli() must return 0/None rather than the
+    # Path main() returns, or every successful run would report as a
+    # failure.
+    raw = tmp_path / "raw_reads"
+    raw.mkdir(parents=True, exist_ok=True)
+    sample_sheet_fp = full_miseq_dir / "sample_sheet.csv"
+    expected_dir = raw / "250407_M03543_0443_000000000-DTHBL_L001"
+
+    result = cli(
+        [
+            "--forward-reads",
+            str(full_miseq_dir / "Undetermined_S0_L001_R1_001.fastq.gz"),
+            "--destination-dir",
+            str(raw),
+            "--sample-sheet",
+            str(sample_sheet_fp),
+            "--min-file-size",
+            "100",
+        ]
+    )
+
+    assert result == 0
+    assert capsys.readouterr().out.strip() == str(expected_dir)
     assert expected_dir.is_dir()
 
 

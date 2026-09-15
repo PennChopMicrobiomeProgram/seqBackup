@@ -14,7 +14,7 @@ dynamic = ["version"]
 homepage = "https://github.com/PennChopMicrobiomeProgram"
 
 [project.scripts]
-backup_illumina = "seqBackupLib.backup:main"
+backup_illumina = "seqBackupLib.backup:cli"
 
 [tool.setuptools.packages.find]
 where = ["."]

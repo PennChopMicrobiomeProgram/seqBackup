@@ -181,4 +181,25 @@ def main(argv=None):
         args.allow_check_failures,
     )
 
+
+def cli(argv=None):
+    """Console-script entry point (see pyproject.toml's [project.scripts]).
+
+    main() returns the archive Path -- library callers (e.g. auto_bfx's
+    archive task, which calls seqBackupLib.backup.main directly and returns
+    its result as the archive location) depend on that. But the installed
+    console-script wraps its entry point as sys.exit(entry_point()), and
+    sys.exit() treats any non-None, non-int argument as an error: it gets
+    printed to stderr and the process exits 1. Routing main()'s Path return
+    straight through sys.exit() would make every successful `backup_illumina`
+    invocation report as a failure. (Currently masked for CHOP's own usage,
+    which invokes this via a scripts/backup_illumina.py runner that calls
+    main() directly and discards the return value -- but the pip-installed
+    backup_illumina console-script would hit it.) This wrapper prints the
+    path instead and returns a real exit code.
+    """
+    write_dir = main(argv)
+    print(write_dir)
+    return 0
+
     # maybe also ask for single or double reads
