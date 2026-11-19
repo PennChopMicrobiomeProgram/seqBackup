@@ -1,6 +1,123 @@
+from __future__ import annotations
+
 import gzip
 import pytest
 from pathlib import Path
+
+
+def _write_ont_fastq(fp: Path, headers: list[str]) -> None:
+    sequence = "ACGTACGTAC"
+    quality = "IIIIIIIIII"
+    with gzip.open(fp, "wt") as handle:
+        for header in headers:
+            handle.write(f"@{header}\n{sequence}\n+\n{quality}\n")
+
+
+def setup_nanopore_dir(
+    base: Path,
+    run_name: str,
+    flowcell_id: str,
+    barcodes: list[str],
+    n_chunks: int = 3,
+) -> Path:
+    """Build a realistic MinKNOW run folder.
+
+    ``barcodes`` is the list of ``fastq_pass`` subdirectory names to create; pass
+    an empty list for a non-multiplexed run (chunks land directly in
+    ``fastq_pass/``).
+    """
+    run_dir = base / run_name
+    fastq_pass = run_dir / "fastq_pass"
+    fastq_pass.mkdir(parents=True, exist_ok=True)
+
+    def _chunks_into(target: Path, label: str, barcode: str | None) -> None:
+        for i in range(n_chunks):
+            fields = [
+                f"{label}-read-{i}-0000-0000-000000000000",
+                "runid=8b1f29fd-6233-456a-9c6c-d8d72cecc734",
+                "ch=5",
+                "start_time=2026-04-01T15:14:56.068015-04:00",
+                f"flow_cell_id={flowcell_id}",
+                "protocol_group_id=CHOPMC-611_NimaGen_04012026",
+                "sample_id=",
+            ]
+            if barcode is not None:
+                fields.append(f"barcode={barcode}")
+                fields.append(f"barcode_alias={barcode}")
+            fields.append(
+                "basecall_model_version_id=dna_r10.4.1_e8.2_400bps_hac@v4.3.0"
+            )
+            # chunk indices deliberately out of lexical order (_10 sorts after _2)
+            _write_ont_fastq(
+                target
+                / f"{flowcell_id}_pass_{label}_8b1f29fd_117e08fc_{i * 5}.fastq.gz",
+                [" ".join(fields)],
+            )
+
+    if barcodes:
+        for barcode in barcodes:
+            sub = fastq_pass / barcode
+            sub.mkdir(parents=True, exist_ok=True)
+            _chunks_into(sub, barcode, barcode)
+    else:
+        _chunks_into(fastq_pass, "all", None)
+
+    # Top-level run reports/metadata that should be archived.
+    (run_dir / f"final_summary_{flowcell_id}_x.txt").write_text(
+        f"instrument=MN47822\nflow_cell_id={flowcell_id}\n"
+    )
+    (run_dir / f"report_{flowcell_id}_x.html").write_text("<html>ONT report</html>")
+    (run_dir / f"report_{flowcell_id}_x.json").write_text('{"run": "ok"}')
+    (run_dir / f"report_{flowcell_id}_x.md").write_text("# ONT report\n")
+    (run_dir / f"sample_sheet_{flowcell_id}_x.csv").write_text(
+        f"flow_cell_id\n{flowcell_id}\n"
+    )
+    (run_dir / f"throughput_{flowcell_id}_x.csv").write_text("minute,reads\n0,0\n")
+    (run_dir / f"barcode_alignment_{flowcell_id}_x.tsv").write_text("barcode\talias\n")
+
+    # Noise that must NOT be archived.
+    (run_dir / ".DS_Store").write_text("junk")
+    (run_dir / ".Rhistory").write_text("")
+    (run_dir / f"sequencing_summary_{flowcell_id}_x.txt").write_text("huge summary\n")
+
+    return run_dir
+
+
+@pytest.fixture
+def minion_dir(tmp_path) -> Path:
+    return setup_nanopore_dir(
+        tmp_path,
+        "20260401_1506_MN47822_FBE92725_8b1f29fd",
+        "FBE92725",
+        ["barcode01", "barcode02", "unclassified"],
+    )
+
+
+@pytest.fixture
+def p2i_dir(tmp_path) -> Path:
+    return setup_nanopore_dir(
+        tmp_path,
+        "20260408_1652_P2I-00513-B_PBK70557_2fe9fcef_Promethion_Training",
+        "PBK70557",
+        ["barcode01", "barcode02", "unclassified"],
+    )
+
+
+@pytest.fixture
+def non_barcoded_nanopore_dir(tmp_path) -> Path:
+    return setup_nanopore_dir(
+        tmp_path,
+        "20260401_1506_MN47822_FBE92725_8b1f29fd",
+        "FBE92725",
+        [],
+    )
+
+
+@pytest.fixture
+def nanopore_sample_sheet(tmp_path) -> Path:
+    fp = tmp_path / "CHOPMC-611_NimaGen_04012026.tsv"
+    fp.write_text("barcode\tsample_id\nbarcode01\tS1\nbarcode02\tS2\n")
+    return fp
 
 
 def setup_illumina_dir(fp: Path, r1: str, r1_lines: list[str]) -> Path:
